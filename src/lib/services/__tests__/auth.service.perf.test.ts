@@ -7,18 +7,15 @@ import type { UserDocument } from '../../db/models-v2/user';
 import { getUserModel } from '../../db/models-v2/user';
 
 const TEST_TIMEOUT = 30000; // 30 seconds
-let connection: mongoose.Connection;
 
 describe('AuthService Performance Tests', () => {
   beforeAll(async () => {
     // Ensure we have a single connection throughout the tests
-    connection = await connectToMongoDB();
+    await connectToMongoDB();
   }, TEST_TIMEOUT);
 
   afterAll(async () => {
-    if (connection) {
-      await connection.close();
-    }
+    await mongoose.disconnect();
   });
 
   it('should handle concurrent getCurrentUser requests efficiently', async () => {

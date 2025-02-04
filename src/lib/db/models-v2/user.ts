@@ -26,8 +26,8 @@ export interface UserDocument extends Document {
 }
 
 const userSchema = new Schema<UserDocument>({
-  clerkId: { type: String, required: true, unique: true },
-  username: { type: String, required: true, unique: true },
+  clerkId: { type: String, required: true },
+  username: { type: String, required: true },
   displayName: { type: String, required: true },
   imageUrl: { type: String, required: true },
   searchIndex: { type: String },
@@ -49,7 +49,12 @@ const userSchema = new Schema<UserDocument>({
   timestamps: true,
 });
 
-// Create indexes
+// Create indexes for frequently queried fields
+userSchema.index({ clerkId: 1 }, { unique: true }); // For getCurrentUser and getUserById
+userSchema.index({ email: 1 }, { sparse: true });   // For getUserByEmail, sparse because email is optional
+userSchema.index({ username: 1 }, { unique: true }); // For getUserByUsername
+
+// Create text search indexes
 userSchema.index({ searchIndex: 'text' });
 userSchema.index({ 
   username: 'text', 
@@ -60,6 +65,10 @@ userSchema.index({
     displayName: 5    // Lower priority
   }
 });
+
+// Create compound indexes for common query patterns
+userSchema.index({ username: 1, displayName: 1 }); // For profile lookups
+userSchema.index({ createdAt: -1 });               // For sorting by newest
 
 // Create searchIndex before saving
 userSchema.pre('save', function(next) {

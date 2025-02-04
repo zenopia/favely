@@ -1,11 +1,47 @@
 import { auth as getAuth } from "@clerk/nextjs/server";
 import { useAuth as useClerkAuth, useClerk } from "@clerk/nextjs";
 import { AuthUser } from "@/types/auth";
-import { connectToMongoDB } from "@/lib/db/client";
+import connectToMongoDB from "@/lib/db/mongodb";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import type { ActiveSessionResource, TokenResource } from '@clerk/types';
+import type { ActiveSessionResource } from '@clerk/types';
 import React from 'react';
 import { headers } from 'next/headers';
+
+// Define projection for user queries to only select needed fields
+const USER_PROJECTION = {
+  clerkId: 1,
+  email: 1,
+  username: 1,
+  displayName: 1,
+  imageUrl: 1,
+  _id: 0
+};
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 100; // ms
+
+const withRetry = async <T>(operation: () => Promise<T>, retries = MAX_RETRIES): Promise<T> => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * INITIAL_RETRY_DELAY));
+    }
+  }
+  throw new Error('Max retries reached');
+};
+
+const transformUser = (user: any): AuthUser => ({
+  id: user.clerkId,
+  email: user.email || null,
+  username: user.username,
+  firstName: null,
+  lastName: null,
+  fullName: user.displayName,
+  imageUrl: user.imageUrl,
+});
 
 export class AuthService {
   static async getCurrentUser(userId?: string | null): Promise<AuthUser | null> {
@@ -34,119 +70,135 @@ export class AuthService {
       }
     }
 
-    // Server-side: direct DB access
-    try {
+    // Server-side: direct DB access with retry
+    return withRetry(async () => {
       await connectToMongoDB();
       const UserModel = await getUserModel();
-      const user = await UserModel.findOne({ clerkId: userId }).lean();
+      const user = await UserModel.findOne(
+        { clerkId: userId },
+        USER_PROJECTION
+      ).lean();
       
-      if (!user) return null;
-      
-      return {
-        id: user.clerkId,
-        email: user.email || null,
-        username: user.username,
-        firstName: null,
-        lastName: null,
-        fullName: user.displayName,
-        imageUrl: user.imageUrl,
-      };
-    } catch (error) {
-      console.error("Error getting current user:", error);
-      return null;
-    }
+      return user ? transformUser(user) : null;
+    });
   }
 
   static async getUserByUsername(username: string): Promise<AuthUser | null> {
-    try {
+    return withRetry(async () => {
       await connectToMongoDB();
       const UserModel = await getUserModel();
-      const user = await UserModel.findOne({ username }).lean();
+      const user = await UserModel.findOne(
+        { username },
+        USER_PROJECTION
+      ).lean();
       
-      if (!user) return null;
-      
-      return {
-        id: user.clerkId,
-        email: user.email || null,
-        username: user.username,
-        firstName: null, // We don't store these separately
-        lastName: null,  // We don't store these separately
-        fullName: user.displayName,
-        imageUrl: user.imageUrl,
-      };
-    } catch (error) {
-      console.error("Error getting user by username:", error);
-      return null;
-    }
+      return user ? transformUser(user) : null;
+    });
   }
 
   static async getUserByClerkId(clerkId: string): Promise<AuthUser | null> {
-    try {
+    return withRetry(async () => {
       await connectToMongoDB();
       const UserModel = await getUserModel();
-      const user = await UserModel.findOne({ clerkId }).lean();
+      const user = await UserModel.findOne(
+        { clerkId },
+        USER_PROJECTION
+      ).lean();
       
-      if (!user) return null;
-      
-      return {
-        id: user.clerkId,
-        email: user.email || null,
-        username: user.username,
-        firstName: null, // We don't store these separately
-        lastName: null,  // We don't store these separately
-        fullName: user.displayName,
-        imageUrl: user.imageUrl,
-      };
-    } catch (error) {
-      console.error("Error getting user by clerk ID:", error);
-      return null;
-    }
+      return user ? transformUser(user) : null;
+    });
   }
 
   static async getUserById(userId: string): Promise<AuthUser | null> {
-    try {
+    return withRetry(async () => {
       await connectToMongoDB();
       const UserModel = await getUserModel();
-      const user = await UserModel.findOne({ clerkId: userId }).lean();
+      const user = await UserModel.findOne(
+        { clerkId: userId },
+        USER_PROJECTION
+      ).lean();
       
-      if (!user) return null;
-      
-      return {
-        id: user.clerkId,
-        email: user.email || null,
-        username: user.username,
-        firstName: null,
-        lastName: null,
-        fullName: user.displayName,
-        imageUrl: user.imageUrl,
-      };
-    } catch (error) {
-      console.error("Error getting user by ID:", error);
-      return null;
-    }
+      return user ? transformUser(user) : null;
+    });
   }
 
   static async getUserByEmail(email: string): Promise<AuthUser | null> {
-    try {
+    return withRetry(async () => {
       await connectToMongoDB();
       const UserModel = await getUserModel();
-      const user = await UserModel.findOne({ email }).lean();
+      const user = await UserModel.findOne(
+        { email },
+        USER_PROJECTION
+      ).lean();
       
-      if (!user) return null;
+      return user ? transformUser(user) : null;
+    });
+  }
+
+  static async getUsersByIds(userIds: string[]): Promise<AuthUser[]> {
+    return withRetry(async () => {
+      await connectToMongoDB();
+      const UserModel = await getUserModel();
+      const users = await UserModel.find(
+        { clerkId: { $in: userIds } },
+        USER_PROJECTION
+      ).lean();
       
-      return {
-        id: user.clerkId,
-        email: user.email || null,
-        username: user.username,
-        firstName: null,
-        lastName: null,
-        fullName: user.displayName,
-        imageUrl: user.imageUrl,
+      return users.map(transformUser);
+    });
+  }
+
+  // Hook for client-side auth state
+  static useAuth() {
+    const clerk = useClerk();
+    const { isSignedIn, isLoaded } = useClerkAuth();
+    const [user, setUser] = React.useState<AuthUser | null>(null);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+      let mounted = true;
+
+      const fetchUser = async () => {
+        try {
+          if (isSignedIn && clerk.session?.id) {
+            const response = await fetch('/api/users/me');
+            if (!response.ok) throw new Error('Failed to fetch user');
+            const userData = await response.json();
+            if (mounted) setUser(userData);
+          } else {
+            if (mounted) setUser(null);
+          }
+        } catch (error) {
+          console.error('Error fetching user:', error);
+          if (mounted) setUser(null);
+        } finally {
+          if (mounted) setLoading(false);
+        }
       };
-    } catch (error) {
-      console.error("Error getting user by email:", error);
-      return null;
-    }
+
+      if (isLoaded) {
+        fetchUser();
+      }
+
+      return () => {
+        mounted = false;
+      };
+    }, [isSignedIn, isLoaded, clerk.session?.id]);
+
+    const signOut = React.useCallback(async () => {
+      try {
+        await clerk.signOut();
+      } catch (error) {
+        console.error('Error signing out:', error);
+      }
+    }, [clerk]);
+
+    return {
+      isSignedIn,
+      isLoaded: isLoaded && !loading,
+      user,
+      signOut
+    };
   }
 }
 
