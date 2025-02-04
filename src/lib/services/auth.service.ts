@@ -1,18 +1,40 @@
 import { auth as getAuth } from "@clerk/nextjs/server";
-import { useAuth as useClerkAuth, useUser, useClerk } from "@clerk/nextjs";
-import type { User } from "@clerk/backend";
+import { useAuth as useClerkAuth, useClerk } from "@clerk/nextjs";
 import { AuthUser } from "@/types/auth";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import type { ActiveSessionResource, TokenResource } from '@clerk/types';
 import React from 'react';
-import { clerkClient } from "@clerk/clerk-sdk-node";
+import { headers } from 'next/headers';
 
 export class AuthService {
-  static async getCurrentUser(): Promise<AuthUser | null> {
-    const { userId } = getAuth();
+  static async getCurrentUser(userId?: string | null): Promise<AuthUser | null> {
+    // If userId is not provided, try to get it from auth context
+    if (!userId) {
+      try {
+        const { userId: authUserId } = getAuth();
+        userId = authUserId;
+      } catch (error) {
+        // If getAuth fails, return null (this happens in client-side or non-app router contexts)
+        return null;
+      }
+    }
+
     if (!userId) return null;
 
+    // If we're in a browser environment, fetch through the API
+    if (typeof window !== 'undefined') {
+      try {
+        const response = await fetch('/api/users/me');
+        if (!response.ok) return null;
+        return response.json();
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+        return null;
+      }
+    }
+
+    // Server-side: direct DB access
     try {
       await connectToMongoDB();
       const UserModel = await getUserModel();
@@ -24,8 +46,8 @@ export class AuthService {
         id: user.clerkId,
         email: user.email || null,
         username: user.username,
-        firstName: null, // We don't store these separately
-        lastName: null,  // We don't store these separately
+        firstName: null,
+        lastName: null,
         fullName: user.displayName,
         imageUrl: user.imageUrl,
       };
@@ -87,13 +109,7 @@ export class AuthService {
       const UserModel = await getUserModel();
       const user = await UserModel.findOne({ clerkId: userId }).lean();
       
-      if (!user) {
-        // Try to get user from Clerk as fallback
-        const clerkUser = await clerkClient.users.getUser(userId);
-        if (!clerkUser) return null;
-        
-        return this.transformClerkUser(clerkUser);
-      }
+      if (!user) return null;
       
       return {
         id: user.clerkId,
@@ -116,15 +132,7 @@ export class AuthService {
       const UserModel = await getUserModel();
       const user = await UserModel.findOne({ email }).lean();
       
-      if (!user) {
-        // Try to get user from Clerk as fallback
-        const users = await clerkClient.users.getUserList({
-          emailAddress: [email]
-        });
-        if (users.length === 0) return null;
-        
-        return this.transformClerkUser(users[0]);
-      }
+      if (!user) return null;
       
       return {
         id: user.clerkId,
@@ -140,35 +148,37 @@ export class AuthService {
       return null;
     }
   }
-
-  static transformClerkUser(user: { 
-    id: string; 
-    emailAddresses?: { emailAddress: string }[]; 
-    username?: string | null; 
-    firstName?: string | null; 
-    lastName?: string | null; 
-    imageUrl?: string | null; 
-  }): AuthUser {
-    return {
-      id: user.id,
-      email: user.emailAddresses?.[0]?.emailAddress || null,
-      username: user.username || null,
-      firstName: user.firstName || null,
-      lastName: user.lastName || null,
-      fullName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || null,
-      imageUrl: user.imageUrl || null,
-    };
-  }
 }
 
 // Client-side hooks
 export function useAuthService() {
-  const { isLoaded, isSignedIn: clerkIsSignedIn, signOut: clerkSignOut } = useClerkAuth();
-  const { user: clerkUser } = useUser();
+  const { isLoaded, isSignedIn, signOut: clerkSignOut } = useClerkAuth();
   const clerk = useClerk();
+  const [user, setUser] = React.useState<AuthUser | null>(null);
 
-  const user = clerkUser ? AuthService.transformClerkUser(clerkUser as unknown as User) : null;
-  const isSignedIn = clerkIsSignedIn ?? false;
+  // Fetch user data when signed in
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      if (!isSignedIn || !clerk.session?.id) return;
+
+      try {
+        const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
+        if (isMounted) {
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('[Auth] Error fetching user data:', error);
+      }
+    };
+
+    fetchUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSignedIn, clerk.session]);
 
   // Log state changes
   React.useEffect(() => {
@@ -247,115 +257,15 @@ export function useAuthService() {
               console.warn('[Auth] Failed to restore session:', clerk.session.id, e);
             }
           }
-
-          // If still no token, try to sign in again
-          if (!token) {
-            console.debug('[Auth] No valid session found, redirecting to sign in');
-            await clerk.openSignIn({
-              redirectUrl: window.location.href,
-              appearance: {
-                variables: {
-                  colorPrimary: '#0F172A',
-                }
-              }
-            });
-          }
         } catch (error) {
-          console.warn('[Auth] Aggressive session recovery failed:', error);
-        }
-      }
-
-      // If we still don't have a token, try one last session refresh
-      if (!token) {
-        try {
-          console.debug('[Auth] Final attempt to refresh session');
-          await clerk.session?.touch();
-          token = await clerk.session?.getToken();
-          if (token) {
-            console.debug('[Auth] Got token after final refresh');
-          }
-        } catch (error) {
-          console.warn('[Auth] Final session refresh failed:', error);
+          console.warn('[Auth] Error in aggressive recovery:', error);
         }
       }
 
       return token;
     } catch (error) {
-      console.error("[Auth] Error getting token:", error);
+      console.error('[Auth] Error getting token:', error);
       return null;
-    }
-  };
-
-  const handleSignIn = async (returnUrl?: string) => {
-    try {
-      console.debug('[Auth] Starting sign in process');
-      // Store the current URL for return after sign in
-      if (typeof window !== 'undefined' && returnUrl) {
-        sessionStorage.setItem('returnUrl', returnUrl);
-        console.debug('[Auth] Stored return URL:', returnUrl);
-      }
-
-      // Special handling for mobile browsers
-      const isMobile = typeof window !== 'undefined' && 
-        /Mobile|Android|iPhone/i.test(window.navigator.userAgent);
-
-      if (isMobile && clerk.session) {
-        console.debug('[Auth] Mobile browser detected, cleaning up session');
-        try {
-          await clerk.session.end();
-        } catch (e) {
-          console.warn('[Auth] Error cleaning up session:', e);
-        }
-      }
-
-      const storedReturnUrl = typeof window !== 'undefined' ? 
-        sessionStorage.getItem('returnUrl') : null;
-      const finalReturnUrl = returnUrl || storedReturnUrl || "/";
-      console.debug('[Auth] Final return URL:', finalReturnUrl);
-
-      // Clear stored return URL
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('returnUrl');
-      }
-
-      console.debug('[Auth] Opening sign in modal');
-      await clerk.openSignIn({
-        redirectUrl: finalReturnUrl,
-        appearance: {
-          variables: {
-            colorPrimary: '#0F172A',
-          }
-        }
-      });
-    } catch (error) {
-      console.error("[Auth] Sign in error:", error);
-      throw error;
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      console.debug('[Auth] Starting sign out process');
-      // End current session to ensure clean state
-      if (clerk.session) {
-        console.debug('[Auth] Ending session:', clerk.session.id);
-        await clerk.session.end();
-      }
-      
-      // Perform the sign out
-      await clerkSignOut();
-      console.debug('[Auth] Signed out successfully');
-      
-      // Force a page reload to ensure clean state
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      }
-    } catch (error) {
-      console.error("[Auth] Sign out error:", error);
-      // Force a reload anyway to ensure clean state
-      if (typeof window !== 'undefined') {
-        window.location.href = '/';
-      }
     }
   };
 
@@ -363,8 +273,7 @@ export function useAuthService() {
     isLoaded,
     isSignedIn,
     user,
-    signIn: handleSignIn,
-    signOut: handleSignOut,
     getToken,
+    signOut: clerkSignOut
   };
 } 

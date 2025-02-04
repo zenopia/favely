@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +25,7 @@ import { ProtectedPageWrapper } from "@/components/auth/protected-page-wrapper";
 import { useClerk } from "@clerk/nextjs";
 import { useProtectedFetch } from "@/hooks/use-protected-fetch";
 import { useRouter } from "next/navigation";
+import { useAuthService } from "@/lib/services/auth.service";
 
 // Remove validation schema since fields are no longer required
 const profileSchema = z.object({
@@ -80,7 +80,7 @@ function ProfileSkeleton() {
 export function ProfilePage({ initialUser }: ProfilePageProps) {
   const router = useRouter();
   const { isReady } = useAuthGuard({ protected: true });
-  const { user: clerkUser } = useUser();
+  const { user, isSignedIn } = useAuthService();
   const { openUserProfile } = useClerk();
   const { fetchWithAuth } = useProtectedFetch();
   const [isLoading, setIsLoading] = useState(false);
@@ -97,13 +97,13 @@ export function ProfilePage({ initialUser }: ProfilePageProps) {
   // Only show skeleton after a delay if still loading
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!isReady || !clerkUser) {
+      if (!isReady || !isSignedIn) {
         setShouldShowSkeleton(true);
       }
     }, 200); // Small delay to prevent flash
 
     return () => clearTimeout(timer);
-  }, [isReady, clerkUser]);
+  }, [isReady, isSignedIn]);
 
   // Check if profile is complete
   useEffect(() => {
@@ -112,9 +112,9 @@ export function ProfilePage({ initialUser }: ProfilePageProps) {
     async function checkProfile() {
       try {
         const response = await fetchWithAuth('/api/profile');
-        const { user, profile } = await response.json();
+        const { user: userData, profile } = await response.json();
         
-        if (user && isMounted) {
+        if (userData && isMounted) {
           setProfileData({
             bio: profile?.bio || "",
             location: profile?.location || "",
@@ -132,14 +132,14 @@ export function ProfilePage({ initialUser }: ProfilePageProps) {
       }
     }
 
-    if (clerkUser && isReady) {
+    if (isSignedIn && isReady) {
       checkProfile();
     }
 
     return () => {
       isMounted = false;
     };
-  }, [isReady]); // Only depend on isReady since we only need to fetch once when the component is ready
+  }, [isReady, isSignedIn]);
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -163,7 +163,7 @@ export function ProfilePage({ initialUser }: ProfilePageProps) {
         toast.success('Profile updated successfully');
         setIsProfileComplete(true);
         // Navigate to the user's profile page
-        router.push(`/profile/${clerkUser?.username}`);
+        router.push(`/profile/${user.username}`);
       } else {
         toast.error('Failed to update profile');
       }
@@ -190,17 +190,17 @@ export function ProfilePage({ initialUser }: ProfilePageProps) {
   };
 
   // Show skeleton after delay if still loading
-  if (shouldShowSkeleton && (!isReady || !clerkUser)) {
+  if (shouldShowSkeleton && (!isReady || !isSignedIn)) {
     return <ProfileSkeleton />;
   }
 
   // Show nothing during initial load to prevent flash
-  if (!isReady || !clerkUser) {
+  if (!isReady || !isSignedIn) {
     return null;
   }
 
-  // Use initialUser if clerkUser is not available yet
-  const user = clerkUser || initialUser;
+  // Use initialUser if authenticated user is not available yet
+  const displayUser = user || initialUser;
 
   return (
     <ProtectedPageWrapper initialUser={initialUser} layoutType="main">
@@ -210,15 +210,15 @@ export function ProfilePage({ initialUser }: ProfilePageProps) {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between py-6 px-4 sm:px-6 lg:px-8 gap-4 border-b">
             <div className="flex items-center gap-6">
               <Image
-                src={user.imageUrl}
-                alt={user.username || "Profile"}
+                src={displayUser.imageUrl || '/images/default-avatar.png'}
+                alt={displayUser.username || "Profile"}
                 width={64}
                 height={64}
                 className="rounded-full"
               />
               <div>
-                <h1 className="text-2xl font-bold">{user.fullName || user.username}</h1>
-                <p className="text-muted-foreground">@{user.username}</p>
+                <h1 className="text-2xl font-bold">{displayUser.fullName || displayUser.username}</h1>
+                <p className="text-muted-foreground">@{displayUser.username}</p>
               </div>
             </div>
             <div className="flex gap-2">

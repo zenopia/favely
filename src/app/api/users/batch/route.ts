@@ -3,7 +3,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import { clerkClient } from "@clerk/clerk-sdk-node";
 
 interface UserResponse {
   id: string;
@@ -35,34 +34,23 @@ export async function POST(
     await connectToMongoDB();
     const UserModel = await getUserModel();
 
-    // Get users from both MongoDB and Clerk
-    const [users, clerkUsers] = await Promise.all([
-      UserModel.find({
-        clerkId: { $in: userIds }
-      })
-        .select("clerkId username displayName bio followersCount followingCount")
-        .lean(),
-      clerkClient.users.getUserList({
-        userId: userIds,
-      })
-    ]);
+    // Get users from MongoDB
+    const users = await UserModel.find({
+      clerkId: { $in: userIds }
+    })
+      .select("clerkId username displayName bio imageUrl followersCount followingCount")
+      .lean();
 
-    // Create maps for quick lookup
-    const userMap = new Map();
-    const clerkUserMap = new Map(clerkUsers.map(u => [u.id, u]));
-
-    users.forEach(user => {
-      const clerkUser = clerkUserMap.get(user.clerkId);
-      userMap.set(user.clerkId, {
-        id: user.clerkId,
-        username: user.username,
-        displayName: user.displayName,
-        bio: user.bio || "",
-        imageUrl: clerkUser?.imageUrl || null,
-        followersCount: user.followersCount || 0,
-        followingCount: user.followingCount || 0
-      });
-    });
+    // Create map for quick lookup
+    const userMap = new Map(users.map(user => [user.clerkId, {
+      id: user.clerkId,
+      username: user.username,
+      displayName: user.displayName,
+      bio: user.bio || "",
+      imageUrl: user.imageUrl || null,
+      followersCount: user.followersCount || 0,
+      followingCount: user.followingCount || 0
+    }]));
 
     // Convert map to array in the same order as requested
     const result = userIds.map(id => userMap.get(id)).filter(Boolean);

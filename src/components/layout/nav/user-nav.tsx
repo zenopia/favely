@@ -2,15 +2,15 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/auth.context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, Settings, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Portal } from "@radix-ui/react-portal";
 import { cn } from "@/lib/utils";
+import { useAuthService } from "@/lib/services/auth.service";
 
 export function UserNav() {
-  const { isSignedIn, isLoaded, user, signOut } = useAuth();
+  const { isSignedIn, isLoaded, user, signOut } = useAuthService();
   const [open, setOpen] = useState(false);
 
   if (!isLoaded) {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
 import { UserProfileBase } from "./user-profile-base";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
@@ -10,6 +9,7 @@ import { toast } from "sonner";
 import { usePathname } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useAuthService } from "@/lib/services/auth.service";
 
 interface UserCardProps {
   username: string;
@@ -35,7 +35,7 @@ function UserCardSkeleton() {
 }
 
 export function UserCard({ username, displayName, imageUrl, isFollowing: initialIsFollowing = false, hideFollow = false }: UserCardProps) {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuthService();
   const { getToken } = useAuthGuard();
   const [isLoading, setIsLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);

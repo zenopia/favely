@@ -11,7 +11,7 @@ import type { EnhancedList } from "@/types/list";
 import { ListLayout } from "@/components/layout/list-layout";
 import { useProtectedFetch } from "@/hooks/use-protected-fetch";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { useUser } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 import { useRouter } from "next/navigation";
 
 interface ListPageContentProps {
@@ -42,7 +42,7 @@ export function ListPageContent({
   const [isCollaborator, setIsCollaborator] = useState(initialIsCollaborator);
   const { fetchWithAuth } = useProtectedFetch();
   const { isSignedIn } = useAuthGuard({ protected: false }); // Don't force auth
-  const { user } = useUser();
+  const { user } = useAuthService();
 
   // Update local pin state when initial value changes
   useEffect(() => {

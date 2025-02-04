@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/auth.context";
 import { MainLayout } from "@/components/layout/main-layout";
 import { SubLayout } from "@/components/layout/sub-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 
 interface ProtectedPageWrapperProps {
   children: React.ReactNode;
@@ -39,7 +39,7 @@ export function ProtectedPageWrapper({
   layoutType = "main",
   title
 }: ProtectedPageWrapperProps) {
-  const { isLoaded, getToken, user } = useAuth();
+  const { isLoaded, isSignedIn, user, getToken } = useAuthService();
   const [shouldShowSkeleton, setShouldShowSkeleton] = useState(false);
   const [isValidated, setIsValidated] = useState(false);
   const router = useRouter();
@@ -52,7 +52,7 @@ export function ProtectedPageWrapper({
 
     const validateSession = async () => {
       try {
-        if (!isLoaded || !user) {
+        if (!isLoaded || !isSignedIn || !user) {
           if (mounted) {
             setIsValidated(false);
           }
@@ -165,7 +165,7 @@ export function ProtectedPageWrapper({
         clearTimeout(retryTimeout);
       }
     };
-  }, [isLoaded, user, initialUser.id, router, getToken, clerk]);
+  }, [isLoaded, isSignedIn, user, initialUser.id, router, getToken, clerk]);
 
   // Only show skeleton after a delay if still loading
   useEffect(() => {
