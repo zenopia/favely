@@ -1,4 +1,4 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { AuthService } from "@/lib/services/auth.service";
 import { getListModel, type ListDocument } from "@/lib/db/models-v2/list";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { getUserModel } from "@/lib/db/models-v2/user";
@@ -22,25 +22,16 @@ interface PageProps {
 
 export default async function ItemPage({ params, _searchParams }: PageProps) {
   try {
-    const { userId } = await auth();
+    const currentUser = await AuthService.getCurrentUser();
+    const userId = currentUser?.id;
 
     // Remove @ if present and decode the username
     const username = decodeURIComponent(params.username).replace(/^@/, '');
 
-    // Get user from Clerk first
-    let profileUser;
-    try {
-      const users = await clerkClient.users.getUserList({
-        username: [username]
-      });
-      profileUser = users[0];
-    } catch (error) {
-      console.error('Error fetching user from Clerk:', error);
-      notFound();
-    }
-
+    // Get user from AuthService
+    const profileUser = await AuthService.getUserByUsername(username);
     if (!profileUser) {
-      console.error(`User not found in Clerk: ${username}`);
+      console.error(`User not found: ${username}`);
       notFound();
     }
 
@@ -135,8 +126,8 @@ export default async function ItemPage({ params, _searchParams }: PageProps) {
         id: profileUser.id,
         clerkId: list.owner.clerkId,
         username: profileUser.username || '',
-        joinedAt: new Date(profileUser.createdAt).toISOString(),
-        displayName: `${profileUser.firstName || ''} ${profileUser.lastName || ''}`.trim(),
+        joinedAt: new Date().toISOString(), // Since we don't have this from AuthService
+        displayName: profileUser.fullName || '',
         imageUrl: profileUser.imageUrl || null
       }
     };

@@ -146,8 +146,6 @@ export function UserCombobox({
   }, [searchValue, initialUsers, excludeUserIds]);
 
   const handleSelect = (user: User) => {
-    // Debug log to see what we're passing to onSelect
-    console.log("Selecting user:", user);
     onSelect({ type: 'user', userId: user.id, username: user.username });
     setSearchValue("");
     setShowDropdown(false);

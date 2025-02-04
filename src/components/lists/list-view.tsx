@@ -10,7 +10,7 @@ import { EditListFAB } from "@/components/layout/FABs/edit-list-fab";
 import { UserCard } from "@/components/users/user-card";
 import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
 import { CollaboratorManagement } from "@/components/lists/collaborator-management";
-import { useUser } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 
 type CollaboratorRole = 'owner' | 'admin' | 'editor' | 'viewer';
 
@@ -35,7 +35,7 @@ export function ListView({
   onCollaboratorsClick,
   onPinChange
 }: ListViewProps) {
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn } = useAuthService();
 
   const handlePinChange = (newPinned: boolean) => {
     onPinChange?.(newPinned);

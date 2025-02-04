@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CollaboratorCard } from "@/components/users/collaborator-card";
 import { UserCombobox } from "@/components/users/user-combobox";
-import { useAuth } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 
 interface Collaborator {
   userId: string;
@@ -54,7 +54,8 @@ export function CollaboratorManagement({
   currentUserRole,
   owner
 }: CollaboratorManagementProps) {
-  const { userId } = useAuth();
+  const { user: currentUser } = useAuthService();
+  const userId = currentUser?.id;
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);

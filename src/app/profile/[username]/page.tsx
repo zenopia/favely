@@ -1,7 +1,6 @@
 import { SubLayout, type SubLayoutProps } from "@/components/layout/sub-layout";
 import { UserProfile } from "@/components/users/user-profile";
 import { ListGrid } from "@/components/lists/list-grid";
-import { clerkClient } from "@clerk/nextjs/server";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { connectToMongoDB } from "@/lib/db/client";
 import { serializeUser } from "@/lib/utils";
@@ -49,17 +48,10 @@ export default async function UserPage({ params, searchParams }: PageProps) {
       notFound();
     }
 
-    // Get user from Clerk using the clerkId from MongoDB
-    let profileUser;
-    try {
-      profileUser = await clerkClient.users.getUser(mongoUser.clerkId);
-    } catch (error) {
-      console.error('Error fetching user from Clerk:', error);
-      notFound();
-    }
-
+    // Get user from AuthService using the clerkId from MongoDB
+    const profileUser = await AuthService.getUserById(mongoUser.clerkId);
     if (!profileUser) {
-      console.error(`User not found in Clerk: ${username}`);
+      console.error(`User not found: ${username}`);
       notFound();
     }
 
@@ -117,7 +109,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
         <div className="max-w-4xl mx-auto space-y-8">
           <UserProfile 
             username={profileUser.username || ""}
-            fullName={`${profileUser.firstName || ""} ${profileUser.lastName || ""}`.trim()}
+            fullName={profileUser.fullName || ""}
             firstName={profileUser.firstName || null}
             lastName={profileUser.lastName || null}
             bio={serializedUser?.bio || null}

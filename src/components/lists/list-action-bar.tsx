@@ -5,7 +5,7 @@ import { Share2, Pin, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 import {
   Tooltip,
   TooltipContent,
@@ -25,7 +25,7 @@ export default function ListActionBar({
   onPinChange,
 }: ListActionBarProps) {
   const router = useRouter();
-  const { user } = useUser();
+  const { user } = useAuthService();
   const [isPinning, setIsPinning] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
 
