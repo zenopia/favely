@@ -5,6 +5,8 @@ import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 import { AuthService } from "@/lib/services/auth.service";
 
+export const dynamic = 'force-dynamic';
+
 interface FollowingResponse {
   following: Array<{
     id: string;

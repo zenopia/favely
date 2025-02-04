@@ -2,7 +2,7 @@
 
 import { ArrowLeft, UserPlus, MessageSquare } from "lucide-react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
-import { useUser } from "@clerk/nextjs"
+import { useAuthService } from "@/lib/services/auth.service"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -55,7 +55,7 @@ export function ListViewNav({
   collaborators = []
 }: ListViewNavProps) {
   const router = useRouter();
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn } = useAuthService();
   const acceptedCollaborators = collaborators.filter(c => c.status === 'accepted');
   const { data: userData } = useUsers(acceptedCollaborators.map(c => c.clerkId).filter((id): id is string => !!id));
 

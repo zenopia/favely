@@ -4,12 +4,12 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { useUser } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 
 export function CreateListFAB() {
   const router = useRouter();
   const { isSignedIn } = useAuthGuard();
-  const { user } = useUser();
+  const { user } = useAuthService();
 
   const handleClick = () => {
     if (!isSignedIn) {

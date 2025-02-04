@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Portal } from "@radix-ui/react-portal";
 import { 
@@ -15,7 +15,7 @@ import {
   Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 import type { NavItem } from "@/types/nav";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -78,36 +78,42 @@ function FeedbackButton({ onClose }: { onClose: () => void }) {
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
-  const { isSignedIn, userId } = useAuth();
-  const { user } = useUser();
+  const [followingItems, setFollowingItems] = useState<NavItem[]>([]);
+  const { user, isSignedIn } = useAuthService();
 
   const handleClose = () => setOpen(false);
 
-  const followingItems: NavItem[] = userId && user?.username ? [
-    {
-      title: "Following",
-      href: `/profile/${user.username}/following`,
-      public: false,
-      icon: Users2,
-      description: "Users you follow",
-      id: "following"
-    },
-    {
-      title: "Followers",
-      href: `/profile/${user.username}/followers`,
-      public: false,
-      icon: UserPlus,
-      description: "Users following you"
-    },
-    {
-      title: "Create List",
-      href: "/profile/lists/create",
-      public: false,
-      icon: Plus,
-      description: "Create a new list",
-      primary: true
+  useEffect(() => {
+    if (isSignedIn && user?.username) {
+      setFollowingItems([
+        {
+          title: "Following",
+          href: `/profile/${user.username}/following`,
+          public: false,
+          icon: Users2,
+          description: "Users you follow",
+          id: "following"
+        },
+        {
+          title: "Followers",
+          href: `/profile/${user.username}/followers`,
+          public: false,
+          icon: UserPlus,
+          description: "Users following you"
+        },
+        {
+          title: "Create List",
+          href: "/profile/lists/create",
+          public: false,
+          icon: Plus,
+          description: "Create a new list",
+          primary: true
+        }
+      ]);
+    } else {
+      setFollowingItems([]);
     }
-  ] : [];
+  }, [isSignedIn, user?.username]);
 
   const renderNavLink = (item: NavItem, index: number) => {
     const Icon = item.icon;

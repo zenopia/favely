@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { NavItem } from "@/types/nav";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuthService } from "@/lib/services/auth.service";
 
 const menuItems: NavItem[] = [
   {
@@ -75,37 +75,43 @@ interface SidebarProps {
 
 export function Sidebar({ className, isMobile = false }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [followingItems, setFollowingItems] = useState<NavItem[]>([]);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
-  const { userId } = useAuth();
-  const { user } = useUser();
+  const { user, isSignedIn } = useAuthService();
 
-  const followingItems: NavItem[] = userId && user?.username ? [
-    {
-      title: "Following",
-      href: `/profile/${user.username}/following`,
-      public: false,
-      icon: Users2,
-      description: "Users you follow",
-      id: "following"
-    },
-    {
-      title: "Followers",
-      href: `/profile/${user.username}/followers`,
-      public: false,
-      icon: UserPlus,
-      description: "Users following you"
-    },
-    {
-      title: "Create List",
-      href: "/profile/lists/create",
-      public: false,
-      icon: PlusCircle,
-      description: "Create a new list",
-      primary: true
+  useEffect(() => {
+    if (isSignedIn && user?.username) {
+      setFollowingItems([
+        {
+          title: "Following",
+          href: `/profile/${user.username}/following`,
+          public: false,
+          icon: Users2,
+          description: "Users you follow",
+          id: "following"
+        },
+        {
+          title: "Followers",
+          href: `/profile/${user.username}/followers`,
+          public: false,
+          icon: UserPlus,
+          description: "Users following you"
+        },
+        {
+          title: "Create List",
+          href: "/profile/lists/create",
+          public: false,
+          icon: PlusCircle,
+          description: "Create a new list",
+          primary: true
+        }
+      ]);
+    } else {
+      setFollowingItems([]);
     }
-  ] : [];
+  }, [isSignedIn, user?.username]);
 
   return (
     <div
