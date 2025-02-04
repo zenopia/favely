@@ -56,7 +56,7 @@ export const POST = withAuth(async (req: NextRequest) => {
   } catch (error) {
     console.error("Feedback submission error:", error);
     return NextResponse.json(
-      { error: "Failed to submit feedback" },
+      { success: false, error: "Failed to submit feedback" },
       { status: 500 }
     );
   }

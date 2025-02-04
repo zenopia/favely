@@ -141,7 +141,14 @@ export class AuthService {
     }
   }
 
-  static transformClerkUser(user: User): AuthUser {
+  static transformClerkUser(user: { 
+    id: string; 
+    emailAddresses?: { emailAddress: string }[]; 
+    username?: string | null; 
+    firstName?: string | null; 
+    lastName?: string | null; 
+    imageUrl?: string | null; 
+  }): AuthUser {
     return {
       id: user.id,
       email: user.emailAddresses?.[0]?.emailAddress || null,

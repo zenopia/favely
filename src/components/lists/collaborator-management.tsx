@@ -129,8 +129,6 @@ export function CollaboratorManagement({
         throw new Error("You don't have permission to add collaborators");
       }
 
-      console.log("Value object:", value);  // Debug log
-
       if (value.type === 'user' && !value.userId) {
         throw new Error("User ID is required for user invites");
       }
@@ -143,8 +141,6 @@ export function CollaboratorManagement({
         status: value.type === 'user' ? 'accepted' : 'pending'
       };
 
-      console.log("Request body:", requestBody);  // Debug log
-
       const response = await fetch(`/api/lists/${listId}/collaborators`, {
         method: 'POST',
         headers: {
@@ -155,12 +151,36 @@ export function CollaboratorManagement({
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Response error:", errorData);  // Debug log
         throw new Error(errorData.error || 'Failed to add collaborator');
       }
 
-      // Fetch fresh collaborator data to ensure we have all the latest information including images
-      await fetchCollaborators();
+      await response.json();
+
+      // For user invites, we want to show them immediately as an accepted collaborator
+      if (value.type === 'user') {
+        // The user data is already in the value object from the combobox
+        const newCollaborator = {
+          userId: value.userId,
+          clerkId: value.userId,
+          username: value.username,
+          role: 'viewer',
+          status: 'accepted',
+          _isEmailInvite: false,
+          imageUrl: (value as any).imageUrl,
+          displayName: (value as any).displayName
+        } as Collaborator;
+        
+        setCollaborators(prevCollaborators => [...prevCollaborators, newCollaborator]);
+      } else {
+        // For email invites, show as pending
+        setCollaborators(prevCollaborators => [...prevCollaborators, {
+          userId: value.email,
+          email: value.email,
+          role: 'viewer',
+          status: 'pending',
+          _isEmailInvite: true
+        } as Collaborator]);
+      }
 
       toast.success(
         value.type === 'user' 
