@@ -70,12 +70,8 @@ jobs:
             cp .env.production .env.production.backup
           fi
           
-          # Clean up
-          rm -rf .next
-          rm -rf node_modules
-          
-          # Pull latest changes
-          git pull origin ${{ github.ref_name }}
+          # Clean up while preserving env files and git directory
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.env.*' ! -name '*.backup' -exec rm -rf {} +
 
     - name: Copy deployment files
       uses: appleboy/scp-action@v0.1.7
@@ -108,6 +104,9 @@ jobs:
           if [ -f .env.production.backup ]; then
             mv .env.production.backup .env.production
           fi
+          
+          # Ensure correct permissions
+          chmod +x start.sh
           
           # Start the application
           pm2 start ecosystem.config.js
