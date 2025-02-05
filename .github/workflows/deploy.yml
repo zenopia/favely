@@ -33,13 +33,13 @@ jobs:
     - name: Install dependencies
       run: npm ci
       env:
-        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        MONGODB_URI_V2: ${{ secrets.MONGODB_URI }}
       
     - name: Build
       run: npm run build
       env:
         NODE_OPTIONS: '--max-old-space-size=4096'
-        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        MONGODB_URI_V2: ${{ secrets.MONGODB_URI }}
     
     - name: Deploy
       uses: appleboy/ssh-action@v1.0.0
