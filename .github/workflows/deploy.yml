@@ -44,7 +44,7 @@ jobs:
         MONGODB_URI_V2: ${{ secrets.MONGODB_URI }}
 
     - name: Create deployment archive
-      run: tar -czf deployment.tar.gz .next node_modules package.json package-lock.json start.sh ${{ steps.set-target.outputs.env_file }}
+      run: tar -czf deployment.tar.gz .next node_modules package.json package-lock.json start.sh
     
     - name: Deploy
       uses: appleboy/ssh-action@v1.0.0
