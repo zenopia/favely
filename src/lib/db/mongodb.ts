@@ -1,9 +1,18 @@
 import mongoose from 'mongoose';
 
+// Load environment variables
 const MONGODB_URI = process.env.MONGODB_URI_V2;
 
 if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI_V2 environment variable inside .env.local');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'MongoDB URI is not defined. Please ensure MONGODB_URI_V2 is set in your environment variables.\n' +
+      'Add it to your .env.local file like this:\n' +
+      'MONGODB_URI_V2=mongodb+srv://your-connection-string'
+    );
+  } else {
+    console.warn('Warning: MONGODB_URI_V2 is not defined in development environment');
+  }
 }
 
 interface MongooseCache {
@@ -34,49 +43,53 @@ if (!global.mongoose) {
 }
 
 async function connectToMongoDB(): Promise<typeof mongoose> {
-  if (cached.conn) {
-    console.log('Using existing MongoDB connection');
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    console.log('Creating new MongoDB connection');
-    cached.promise = mongoose.connect(MONGODB_URI, options)
-      .then((mongoose) => {
-        return mongoose;
-      })
-      .catch((error) => {
-        console.error('MongoDB connection error:', error);
-        throw error;
-      });
-  }
-
   try {
+    // If we already have a connection, return it
+    if (cached.conn) {
+      return cached.conn;
+    }
+
+    // If we're already connecting, wait for the connection
+    if (cached.promise) {
+      return await cached.promise;
+    }
+
+    // Set up connection event handlers only once
+    if (!cached.conn) {
+      mongoose.connection.on('connected', () => {
+        console.log('MongoDB connection established');
+      });
+
+      mongoose.connection.on('error', (err) => {
+        console.error('MongoDB connection error:', err);
+      });
+
+      mongoose.connection.on('disconnected', () => {
+        console.log('MongoDB connection disconnected');
+      });
+
+      process.on('SIGINT', async () => {
+        if (mongoose.connection.readyState === 1) {
+          await mongoose.connection.close();
+        }
+        process.exit(0);
+      });
+    }
+
+    // Create new connection
+    if (!MONGODB_URI) {
+      throw new Error('MongoDB URI is not defined');
+    }
+
+    cached.promise = mongoose.connect(MONGODB_URI, options);
     cached.conn = await cached.promise;
-    console.log('Successfully connected to MongoDB');
+    
     return cached.conn;
   } catch (error) {
+    console.error('Error connecting to MongoDB:', error);
     cached.promise = null;
     throw error;
   }
 }
-
-// Monitor connection events
-mongoose.connection.on('connected', () => {
-  console.log('MongoDB connection established');
-});
-
-mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error:', err);
-});
-
-mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB connection disconnected');
-});
-
-process.on('SIGINT', async () => {
-  await mongoose.connection.close();
-  process.exit(0);
-});
 
 export default connectToMongoDB; 

@@ -48,10 +48,14 @@ export class AuthService {
     // If userId is not provided, try to get it from auth context
     if (!userId) {
       try {
-        const { userId: authUserId } = getAuth();
-        userId = authUserId;
+        // Only try to get auth on server side
+        if (typeof window === 'undefined') {
+          const { userId: authUserId } = getAuth();
+          userId = authUserId;
+        }
       } catch (error) {
-        // If getAuth fails, return null (this happens in client-side or non-app router contexts)
+        // If getAuth fails, return null
+        console.debug('Failed to get auth:', error);
         return null;
       }
     }
@@ -61,7 +65,10 @@ export class AuthService {
     // If we're in a browser environment, fetch through the API
     if (typeof window !== 'undefined') {
       try {
-        const response = await fetch('/api/users/me');
+        const response = await fetch('/api/users/me', {
+          // Add cache: no-store to prevent caching issues
+          cache: 'no-store'
+        });
         if (!response.ok) return null;
         return response.json();
       } catch (error) {
@@ -151,11 +158,14 @@ export class AuthService {
   // Hook for client-side auth state
   static useAuth() {
     const clerk = useClerk();
-    const { isSignedIn, isLoaded } = useClerkAuth();
+    const { isSignedIn, isLoaded: clerkLoaded } = useClerkAuth();
     const [user, setUser] = React.useState<AuthUser | null>(null);
-    const [loading, setLoading] = React.useState(true);
+    const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
+      // Only run on the client side
+      if (typeof window === 'undefined') return;
+
       let mounted = true;
 
       const fetchUser = async () => {
@@ -172,22 +182,23 @@ export class AuthService {
           console.error('Error fetching user:', error);
           if (mounted) setUser(null);
         } finally {
-          if (mounted) setLoading(false);
+          if (mounted) setIsLoading(false);
         }
       };
 
-      if (isLoaded) {
+      if (clerkLoaded) {
         fetchUser();
       }
 
       return () => {
         mounted = false;
       };
-    }, [isSignedIn, isLoaded, clerk.session?.id]);
+    }, [isSignedIn, clerkLoaded, clerk.session?.id]);
 
     const signOut = React.useCallback(async () => {
       try {
         await clerk.signOut();
+        setUser(null);
       } catch (error) {
         console.error('Error signing out:', error);
       }
@@ -195,7 +206,7 @@ export class AuthService {
 
     return {
       isSignedIn,
-      isLoaded: isLoaded && !loading,
+      isLoaded: clerkLoaded && !isLoading,
       user,
       signOut
     };
@@ -207,50 +218,18 @@ export function useAuthService() {
   const { isLoaded, isSignedIn, signOut: clerkSignOut } = useClerkAuth();
   const clerk = useClerk();
   const [user, setUser] = React.useState<AuthUser | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
 
-  // Fetch user data when signed in
-  React.useEffect(() => {
-    let isMounted = true;
+  // Cache user data in memory
+  const userCache = React.useRef<{
+    id: string;
+    data: AuthUser;
+    timestamp: number;
+  } | null>(null);
 
-    const fetchUser = async () => {
-      if (!isSignedIn || !clerk.session?.id) return;
-
-      try {
-        const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
-        if (isMounted) {
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error('[Auth] Error fetching user data:', error);
-      }
-    };
-
-    fetchUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isSignedIn, clerk.session]);
-
-  // Log state changes
-  React.useEffect(() => {
-    console.debug('[Auth] State changed:', {
-      isLoaded,
-      isSignedIn,
-      hasUser: !!user,
-      hasSession: !!clerk.session,
-      sessionId: clerk.session?.id
-    });
-  }, [isLoaded, isSignedIn, user, clerk.session]);
-
-  const getToken = async () => {
+  // Get token with retry logic
+  const getToken = React.useCallback(async () => {
     try {
-      console.debug('[Auth] Getting token, current state:', {
-        hasSession: !!clerk.session,
-        sessionId: clerk.session?.id,
-        isSignedIn
-      });
-
       if (!clerk.session) {
         console.warn("[Auth] No clerk session found");
         return null;
@@ -261,25 +240,14 @@ export function useAuthService() {
         try {
           // First try to get the token directly
           const token = await clerk.session?.getToken();
-          if (token) {
-            console.debug('[Auth] Got token directly');
-            return token;
-          }
+          if (token) return token;
 
-          console.debug('[Auth] No token, attempting to restore session...');
+          // If no token, try to restore session
           await clerk.session?.touch();
-          
-          // Wait for session to be touched
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-          // Try to get token again
-          const newToken = await clerk.session?.getToken();
-          if (newToken) {
-            console.debug('[Auth] Got token after session touch');
-          }
-          return newToken;
+          await new Promise(resolve => setTimeout(resolve, 100));
+          return await clerk.session?.getToken();
         } catch (error) {
-          console.warn('[Auth] Error in getTokenWithPersistence:', error);
+          console.warn('[Auth] Error getting token:', error);
           return null;
         }
       };
@@ -287,30 +255,18 @@ export function useAuthService() {
       let token = await getTokenWithPersistence();
 
       // If still no token and we're on mobile, try more aggressive recovery
-      if (!token && /Mobile|Android|iPhone/i.test(window.navigator.userAgent)) {
-        console.debug('[Auth] Mobile browser detected, attempting aggressive session recovery...');
-        
+      if (!token && typeof window !== 'undefined' && /Mobile|Android|iPhone/i.test(window.navigator.userAgent)) {
         try {
-          // Try to force a new session
           await clerk.session?.end();
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 100));
           
-          // Try to get current session
           if (clerk.session) {
-            try {
-              console.debug('[Auth] Trying to restore session:', clerk.session.id);
-              await clerk.session.touch();
-              await new Promise(resolve => setTimeout(resolve, 500));
-              token = await clerk.session.getToken();
-              if (token) {
-                console.debug('[Auth] Successfully recovered session:', clerk.session.id);
-              }
-            } catch (e) {
-              console.warn('[Auth] Failed to restore session:', clerk.session.id, e);
-            }
+            await clerk.session.touch();
+            await new Promise(resolve => setTimeout(resolve, 100));
+            token = await clerk.session.getToken();
           }
         } catch (error) {
-          console.warn('[Auth] Error in aggressive recovery:', error);
+          console.warn('[Auth] Error in mobile recovery:', error);
         }
       }
 
@@ -319,13 +275,77 @@ export function useAuthService() {
       console.error('[Auth] Error getting token:', error);
       return null;
     }
-  };
+  }, [clerk.session]);
+
+  // Fetch user data when signed in
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const fetchUser = async () => {
+      if (!isSignedIn || !clerk.session?.id) {
+        if (isMounted) {
+          setUser(null);
+          setIsInitialLoad(false);
+        }
+        return;
+      }
+
+      try {
+        // Check cache first
+        if (userCache.current && 
+            userCache.current.id === clerk.session.user?.id &&
+            Date.now() - userCache.current.timestamp < 5 * 60 * 1000) { // 5 minutes cache
+          if (isMounted) {
+            setUser(userCache.current.data);
+            setIsInitialLoad(false);
+          }
+          return;
+        }
+
+        const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
+        if (isMounted) {
+          setUser(userData);
+          setIsInitialLoad(false);
+          
+          // Update cache
+          if (userData) {
+            userCache.current = {
+              id: clerk.session.user?.id as string,
+              data: userData,
+              timestamp: Date.now()
+            };
+          }
+        }
+      } catch (error) {
+        console.error('[Auth] Error fetching user data:', error);
+        if (isMounted) {
+          setUser(null);
+          setIsInitialLoad(false);
+        }
+      }
+    };
+
+    if (isLoaded) {
+      fetchUser();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isSignedIn, isLoaded, clerk.session]);
+
+  // Clear cache on sign out
+  const handleSignOut = React.useCallback(async () => {
+    userCache.current = null;
+    setUser(null);
+    await clerkSignOut();
+  }, [clerkSignOut]);
 
   return {
-    isLoaded,
     isSignedIn,
+    isLoaded: isLoaded && !isInitialLoad,
     user,
-    getToken,
-    signOut: clerkSignOut
+    signOut: handleSignOut,
+    getToken
   };
 } 

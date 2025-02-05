@@ -8,6 +8,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  env: {
+    MONGODB_URI_V2: process.env.MONGODB_URI_V2,
+  },
   images: {
     remotePatterns: [
       {

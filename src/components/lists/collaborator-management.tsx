@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { CollaboratorCard } from "@/components/users/collaborator-card";
 import { UserCombobox } from "@/components/users/user-combobox";
 import { useAuthService } from "@/lib/services/auth.service";
+import { useVirtualizer } from '@tanstack/react-virtual';
+import React from 'react';
 
 interface Collaborator {
   userId: string;
@@ -63,51 +65,111 @@ export function CollaboratorManagement({
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [isLoadingFollowing, setIsLoadingFollowing] = useState(true);
   const [privacy, setPrivacy] = useState(initialPrivacy);
+  const parentRef = React.useRef<HTMLDivElement>(null);
 
   const canManageCollaborators = isOwner || currentUserRole === 'admin';
 
-  useEffect(() => {
-    // Trigger open animation after mount
-    requestAnimationFrame(() => {
-      setIsOpen(true);
-    });
-  }, []);
+  // Create virtualizer for collaborator list
+  const rowVirtualizer = useVirtualizer({
+    count: collaborators.length + 1, // +1 for owner
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80, // Estimated height of each collaborator card
+    overscan: 5, // Number of items to render outside of the visible area
+  });
 
-  // Function to fetch collaborators
-  const fetchCollaborators = async () => {
+  // Memoize the filtered collaborators list
+  const filteredCollaborators = React.useMemo(() => 
+    collaborators.filter(c => c.role !== 'owner'),
+    [collaborators]
+  );
+
+  // Function to fetch collaborators with caching
+  const fetchCollaborators = React.useCallback(async () => {
     setIsLoadingCollaborators(true);
     try {
+      const cacheKey = `collaborators-${listId}`;
+      const cachedData = sessionStorage.getItem(cacheKey);
+      
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const isExpired = Date.now() - timestamp > 30000; // Cache for 30 seconds
+        
+        if (!isExpired) {
+          setCollaborators(data);
+          setIsLoadingCollaborators(false);
+          return;
+        }
+      }
+
       const response = await fetch(`/api/lists/${listId}/collaborators`);
       if (!response.ok) throw new Error();
       const data = await response.json();
+      
+      // Cache the response
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: data.collaborators,
+        timestamp: Date.now()
+      }));
+
       setCollaborators(data.collaborators || []);
     } catch (error) {
       toast.error("Failed to load collaborators");
     } finally {
       setIsLoadingCollaborators(false);
     }
-  };
-
-  useEffect(() => {
-    fetchCollaborators();
   }, [listId]);
 
+  // Fetch collaborators on mount
   useEffect(() => {
-    const fetchFollowing = async () => {
-      try {
-        const response = await fetch('/api/users/following');
-        if (!response.ok) throw new Error();
-        const data = await response.json();
-        setFollowingIds(data.following.map((result: FollowingResult) => result.followingId));
-      } catch (error) {
-        console.error('Failed to fetch following:', error);
-        toast.error("Failed to load following users");
-      } finally {
-        setIsLoadingFollowing(false);
-      }
-    };
+    fetchCollaborators();
+  }, [fetchCollaborators]);
 
+  // Fetch following users with caching
+  const fetchFollowing = React.useCallback(async () => {
+    try {
+      const cacheKey = 'following-users';
+      const cachedData = sessionStorage.getItem(cacheKey);
+      
+      if (cachedData) {
+        const { data, timestamp } = JSON.parse(cachedData);
+        const isExpired = Date.now() - timestamp > 60000; // Cache for 1 minute
+        
+        if (!isExpired) {
+          setFollowingIds(data);
+          setIsLoadingFollowing(false);
+          return;
+        }
+      }
+
+      const response = await fetch('/api/users/following');
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      const followingIds = data.following.map((result: FollowingResult) => result.followingId);
+      
+      // Cache the response
+      sessionStorage.setItem(cacheKey, JSON.stringify({
+        data: followingIds,
+        timestamp: Date.now()
+      }));
+
+      setFollowingIds(followingIds);
+    } catch (error) {
+      console.error('Failed to fetch following:', error);
+      toast.error("Failed to load following users");
+    } finally {
+      setIsLoadingFollowing(false);
+    }
+  }, []);
+
+  useEffect(() => {
     fetchFollowing();
+  }, [fetchFollowing]);
+
+  useEffect(() => {
+    // Trigger open animation after mount
+    requestAnimationFrame(() => {
+      setIsOpen(true);
+    });
   }, []);
 
   const handleClose = () => {
@@ -396,7 +458,7 @@ export function CollaboratorManagement({
             </Button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 pt-4">
+          <div className="flex-1 overflow-y-auto p-6 pt-4" ref={parentRef}>
             <div className="space-y-6 pb-40">
               {/* Privacy section */}
               <div className="space-y-4">
@@ -450,7 +512,7 @@ export function CollaboratorManagement({
                 </>
               )}
 
-              {/* Collaborators list */}
+              {/* Virtualized collaborators list */}
               <div className="space-y-4">
                 {isLoadingCollaborators ? (
                   <CollaboratorCard
@@ -462,48 +524,66 @@ export function CollaboratorManagement({
                     className="animate-pulse"
                   />
                 ) : (
-                  <>
-                    {/* Show owner first */}
-                    <CollaboratorCard
-                      key={`owner-${owner.clerkId}`}
-                      userId={owner.clerkId}
-                      username={owner.username}
-                      imageUrl={owner.imageUrl}
-                      role="owner"
-                      status="accepted"
-                      clerkId={owner.clerkId}
-                      canManageRoles={false}
-                      isOwner={isOwner}
-                      displayName={owner.displayName}
-                    />
+                  <div
+                    style={{
+                      height: `${rowVirtualizer.getTotalSize()}px`,
+                      width: '100%',
+                      position: 'relative',
+                    }}
+                  >
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const isOwnerRow = virtualRow.index === 0;
+                      const collaborator = isOwnerRow ? null : filteredCollaborators[virtualRow.index - 1];
 
-                    {/* Show other collaborators */}
-                    {collaborators.filter(c => c.role !== 'owner').map(collaborator => {
-                      const isCurrentUser = collaborator.userId === userId;
-                      const canManageRoles = canManageCollaborators && collaborator.role !== 'owner';
-                      const uniqueKey = collaborator._isEmailInvite 
-                        ? `email-invite-${collaborator.email}-${collaborator.userId}`
-                        : `collaborator-${collaborator.userId}`;
                       return (
-                        <CollaboratorCard
-                          key={uniqueKey}
-                          userId={collaborator.userId}
-                          username={collaborator.username}
-                          email={collaborator.email}
-                          imageUrl={collaborator.imageUrl}
-                          role={collaborator.role}
-                          status={collaborator.status}
-                          clerkId={!collaborator._isEmailInvite ? collaborator.clerkId : undefined}
-                          canManageRoles={canManageRoles}
-                          isOwner={isOwner}
-                          currentUserRole={isCurrentUser ? collaborator.role : undefined}
-                          onRoleChange={(newRole) => handleRoleChange(collaborator.userId, newRole)}
-                          onRemove={() => handleRemoveCollaborator(collaborator.userId)}
-                          displayName={collaborator.displayName}
-                        />
+                        <div
+                          key={isOwnerRow ? 'owner' : collaborator?.userId}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: `${virtualRow.size}px`,
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          {isOwnerRow ? (
+                            <CollaboratorCard
+                              key={`owner-${owner.clerkId}`}
+                              userId={owner.clerkId}
+                              username={owner.username}
+                              imageUrl={owner.imageUrl}
+                              role="owner"
+                              status="accepted"
+                              clerkId={owner.clerkId}
+                              canManageRoles={false}
+                              isOwner={isOwner}
+                              displayName={owner.displayName}
+                            />
+                          ) : collaborator && (
+                            <CollaboratorCard
+                              key={collaborator._isEmailInvite 
+                                ? `email-invite-${collaborator.email}-${collaborator.userId}`
+                                : `collaborator-${collaborator.userId}`}
+                              userId={collaborator.userId}
+                              username={collaborator.username}
+                              email={collaborator.email}
+                              imageUrl={collaborator.imageUrl}
+                              role={collaborator.role}
+                              status={collaborator.status}
+                              clerkId={!collaborator._isEmailInvite ? collaborator.clerkId : undefined}
+                              canManageRoles={canManageCollaborators && collaborator.role !== 'owner'}
+                              isOwner={isOwner}
+                              currentUserRole={collaborator.userId === userId ? collaborator.role : undefined}
+                              onRoleChange={(newRole) => handleRoleChange(collaborator.userId, newRole)}
+                              onRemove={() => handleRemoveCollaborator(collaborator.userId)}
+                              displayName={collaborator.displayName}
+                            />
+                          )}
+                        </div>
                       );
                     })}
-                  </>
+                  </div>
                 )}
               </div>
             </div>

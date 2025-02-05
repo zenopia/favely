@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { usePathname } from "next/navigation";
+import React from "react";
 
 export interface CollaboratorCardProps {
   userId: string;
@@ -39,7 +40,7 @@ export interface CollaboratorCardProps {
   displayName?: string;
 }
 
-export function CollaboratorCard({ 
+export const CollaboratorCard = React.memo(function CollaboratorCard({ 
   userId, 
   username, 
   email,
@@ -60,27 +61,14 @@ export function CollaboratorCard({
   displayName
 }: CollaboratorCardProps) {
   const isEmailInvite = !clerkId;
-  const { data: users, isLoading } = useUsers(isEmailInvite ? [] : [userId]);
-  const userData = isEmailInvite ? null : users?.[0];
   const pathname = usePathname();
-  const relativePath = pathname.startsWith('/') ? pathname.slice(1) : pathname;
-  const usernameWithAt = username ? (username.startsWith('@') ? username : `@${username}`) : '';
+  const relativePath = pathname.replace(/^\//, '');
+  const usernameWithAt = username?.startsWith('@') ? username : username ? `@${username}` : '';
 
-  if (isLoading && !imageUrl) {
-    return (
-      <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
-          <div className="space-y-2">
-            <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-            <div className="h-3 w-16 bg-muted animate-pulse rounded" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { data: userData, isLoading } = useUsers(clerkId ? [clerkId] : undefined);
+  const user = userData?.[0];
 
-  const getRoleBadgeVariant = (role: string) => {
+  const roleBadgeVariant = React.useMemo(() => {
     switch (role) {
       case 'owner':
         return 'default';
@@ -91,7 +79,22 @@ export function CollaboratorCard({
       default:
         return 'outline';
     }
-  };
+  }, [role]);
+
+  if (!isEmailInvite && isLoading) {
+    return (
+      <div className="flex items-center justify-between p-4 rounded-lg border bg-card animate-pulse">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-full bg-muted" />
+          <div className="space-y-2">
+            <div className="h-4 w-32 bg-muted rounded" />
+            <div className="h-3 w-24 bg-muted rounded" />
+          </div>
+        </div>
+        <div className="h-6 w-16 bg-muted rounded" />
+      </div>
+    );
+  }
 
   const roleDisplay = (
     (canManageRoles || currentUserRole) && role !== 'owner' ? (
@@ -139,7 +142,7 @@ export function CollaboratorCard({
       </DropdownMenu>
     ) : (
       <div className="flex items-center gap-2">
-        <Badge variant={getRoleBadgeVariant(role)} className="capitalize">
+        <Badge variant={roleBadgeVariant} className="capitalize">
           {role}
         </Badge>
       </div>
@@ -167,9 +170,9 @@ export function CollaboratorCard({
           </div>
         ) : (
           <UserProfileBase
-            username={username || userData?.username || ''}
-            firstName={displayName || userData?.displayName}
-            imageUrl={imageUrl || userData?.imageUrl}
+            username={username || user?.username || ''}
+            firstName={displayName || user?.displayName}
+            imageUrl={imageUrl || user?.imageUrl}
             variant="compact"
             hideFollow={true}
             linkToProfile={false}
@@ -191,4 +194,4 @@ export function CollaboratorCard({
   }
 
   return content;
-} 
+}); 

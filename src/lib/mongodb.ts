@@ -1,42 +1,63 @@
 import mongoose from 'mongoose';
 
+// Load environment variables
 const MONGODB_URI = process.env.MONGODB_URI_V2;
 
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI_V2 environment variable inside .env.local');
+// Debug environment variables
+if (process.env.NODE_ENV !== 'production') {
+  console.log('Environment:', {
+    NODE_ENV: process.env.NODE_ENV,
+    hasMongoURI: !!MONGODB_URI,
+  });
 }
 
-interface GlobalMongoose {
-  conn: mongoose.Connection | null;
-  promise: Promise<mongoose.Connection> | null;
+if (!MONGODB_URI) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'MongoDB URI is not defined. Please ensure MONGODB_URI_V2 is set in your environment variables.\n' +
+      'Add it to your .env.local file like this:\n' +
+      'MONGODB_URI_V2=mongodb+srv://your-connection-string'
+    );
+  } else {
+    console.warn('Warning: MONGODB_URI_V2 is not defined in development environment');
+  }
+}
+
+interface MongooseCache {
+  conn: mongoose.Mongoose | null;
+  promise: Promise<mongoose.Mongoose> | null;
 }
 
 declare global {
-  // eslint-disable-next-line no-var
-  var mongoose: GlobalMongoose | undefined;
+  var mongoose: MongooseCache | undefined;
 }
 
-const cached: GlobalMongoose = global.mongoose || {
-  conn: null,
-  promise: null,
+const options: mongoose.ConnectOptions = {
+  maxPoolSize: 10,
+  minPoolSize: 5,
+  socketTimeoutMS: 45000,
+  connectTimeoutMS: 10000,
+  serverSelectionTimeoutMS: 5000,
+  heartbeatFrequencyMS: 10000,
+  retryWrites: true,
+  w: 'majority',
+  wtimeoutMS: 2500,
 };
+
+let cached: MongooseCache = global.mongoose || { conn: null, promise: null };
 
 if (!global.mongoose) {
   global.mongoose = cached;
 }
 
-async function dbConnect(): Promise<mongoose.Connection> {
+async function connectToMongoDB(): Promise<mongoose.Mongoose> {
   if (cached.conn) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose.connection;
+    cached.promise = mongoose.connect(MONGODB_URI, options).then((mongoose) => {
+      return mongoose;
     });
   }
 
@@ -50,4 +71,4 @@ async function dbConnect(): Promise<mongoose.Connection> {
   return cached.conn;
 }
 
-export default dbConnect;
+export default connectToMongoDB;
