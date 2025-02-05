@@ -46,6 +46,7 @@ export default async function ProfileListsPage({ searchParams }: PageProps) {
           fullName: user.fullName || null,
           imageUrl: user.imageUrl || "",
         }}
+        pageType="owned"
       />
     );
   } catch (error) {
