@@ -25,26 +25,44 @@ interface PinDocument {
   lastViewedAt: Date;
 }
 
+interface PaginatedListsResponse {
+  lists: EnhancedList[];
+  nextCursor?: string;
+  hasMore: boolean;
+}
+
 export async function getEnhancedLists(
   query: FilterQuery<MongoListDocument> = {}, 
-  options: QueryOptions<MongoListDocument> = {}
-): Promise<{
-  lists: EnhancedList[];
-  lastViewedMap?: Record<string, Date>;
-}> {
+  options: QueryOptions<MongoListDocument> = {},
+  cursor?: string,
+  limit: number = 20
+): Promise<PaginatedListsResponse> {
   const user = await AuthService.getCurrentUser();
   await connectToMongoDB();
+
+  // If cursor is provided, add it to the query
+  if (cursor) {
+    query._id = { $lt: new Types.ObjectId(cursor) };
+  }
+
+  // Add sorting by _id in descending order for cursor pagination
+  options.sort = { _id: -1, ...(options.sort || {}) };
+  options.limit = limit + 1; // Get one extra to check if there are more items
 
   // Fetch lists based on query
   const ListModel = await getListModel();
   const lists = await ListModel.find(query, null, options).lean() as unknown as MongoListDocument[];
 
+  // Check if there are more items
+  const hasMore = lists.length > limit;
+  const limitedLists = hasMore ? lists.slice(0, -1) : lists;
+
   // Get unique owner IDs
-  const ownerIds = Array.from(new Set(lists.map(list => list.owner.clerkId)));
+  const ownerIds = Array.from(new Set(limitedLists.map(list => list.owner.clerkId)));
 
   // Fetch user data for all owners in one query
   const UserCacheModel = await getUserCacheModel();
-  const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour instead of 24 hours
+  const CACHE_TTL = 1 * 60 * 60 * 1000; // 1 hour
   let userCaches = await UserCacheModel.find({
     clerkId: { $in: ownerIds },
     lastSynced: { $gt: new Date(Date.now() - CACHE_TTL) }
@@ -140,7 +158,7 @@ export async function getEnhancedLists(
   }
 
   // Enhance lists with owner data
-  const enhancedLists = lists.map(list => {
+  const enhancedLists = limitedLists.map(list => {
     const userData = userDataMap.get(list.owner.clerkId);
     const baseList: List = {
       id: list._id.toString(),
@@ -196,9 +214,11 @@ export async function getEnhancedLists(
     return enhanced;
   });
 
+  // Return the paginated response
   return {
     lists: enhancedLists,
-    lastViewedMap
+    nextCursor: hasMore ? limitedLists[limitedLists.length - 1]._id.toString() : undefined,
+    hasMore
   };
 }
 

@@ -6,6 +6,13 @@ import { MyListsContent } from "@/components/lists/my-lists-content";
 
 interface MyListsLayoutProps {
   lists: EnhancedList[];
+  nextCursor?: string;
+  hasMore: boolean;
+  fetchMore: (cursor: string) => Promise<{
+    lists: EnhancedList[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }>;
   initialUser: {
     id: string;
     username: string | null;
@@ -14,14 +21,25 @@ interface MyListsLayoutProps {
   };
 }
 
-export function MyListsLayout({ lists, initialUser }: MyListsLayoutProps) {
+export function MyListsLayout({ 
+  lists: initialLists,
+  nextCursor: initialCursor,
+  hasMore: initialHasMore,
+  fetchMore,
+  initialUser 
+}: MyListsLayoutProps) {
   return (
     <ProtectedPageWrapper 
       initialUser={initialUser}
       layoutType="main"
       title="My Lists"
     >
-      <MyListsContent lists={lists} />
+      <MyListsContent 
+        initialLists={initialLists}
+        initialCursor={initialCursor}
+        initialHasMore={initialHasMore}
+        fetchMore={fetchMore}
+      />
     </ProtectedPageWrapper>
   );
 } 

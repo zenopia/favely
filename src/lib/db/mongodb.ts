@@ -25,15 +25,17 @@ declare global {
 }
 
 const options: mongoose.ConnectOptions = {
-  maxPoolSize: 10,        // Maximum number of connections in the pool
+  maxPoolSize: 20,        // Increased for better concurrent request handling
   minPoolSize: 5,         // Minimum number of connections in the pool
   socketTimeoutMS: 45000, // How long to wait for responses
   connectTimeoutMS: 10000,// How long to wait for initial connection
   serverSelectionTimeoutMS: 5000, // How long to wait for server selection
-  heartbeatFrequencyMS: 10000,    // How often to check connection health
+  heartbeatFrequencyMS: 5000,     // Reduced for faster connection health checks
   retryWrites: true,              // Automatically retry failed writes
   w: 'majority',                  // Write concern
   wtimeoutMS: 2500,              // Write concern timeout
+  autoIndex: process.env.NODE_ENV !== 'production', // Disable auto-indexing in production
+  maxIdleTimeMS: 60000,          // Close idle connections after 1 minute
 };
 
 let cached: MongooseCache = global.mongoose || { conn: null, promise: null };

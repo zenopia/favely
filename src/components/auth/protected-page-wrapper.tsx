@@ -41,117 +41,38 @@ export function ProtectedPageWrapper({
 }: ProtectedPageWrapperProps) {
   const { isLoaded, isSignedIn, user, getToken } = useAuthService();
   const [shouldShowSkeleton, setShouldShowSkeleton] = useState(false);
-  const [isValidated, setIsValidated] = useState(false);
+  const [isValidating, setIsValidating] = useState(true);
   const router = useRouter();
   const clerk = useClerk();
 
   // Validate session token
   useEffect(() => {
     let mounted = true;
-    let retryTimeout: NodeJS.Timeout;
 
     const validateSession = async () => {
       try {
-        if (!isLoaded || !isSignedIn || !user) {
-          if (mounted) {
-            setIsValidated(false);
-          }
+        // If we have initial data, we don't need to show a skeleton
+        if (initialUser) {
+          setIsValidating(false);
           return;
         }
 
-        // Special handling for mobile browsers
-        const isMobile = typeof window !== 'undefined' && 
-          /Mobile|Android|iPhone/i.test(window.navigator.userAgent);
+        if (!isLoaded || !isSignedIn) {
+          return;
+        }
 
-        // Get token with retries for mobile
-        let token = null;
-        let retryCount = 0;
-        const maxRetries = 3;
+        const token = await getToken();
+        if (!token && mounted) {
+          router.push('/sign-in');
+          return;
+        }
 
-        const tryGetToken = async () => {
-          try {
-            // Try to get a fresh session first
-            if (isMobile && clerk.session) {
-              await clerk.session.touch();
-              // Small delay to allow session update
-              await new Promise(resolve => setTimeout(resolve, 100));
-            }
-
-            token = await getToken();
-            
-            if (!token && retryCount < maxRetries) {
-              retryCount++;
-              // Exponential backoff
-              const delay = Math.min(100 * Math.pow(2, retryCount), 1000);
-              retryTimeout = setTimeout(tryGetToken, delay);
-              return;
-            }
-
-            if (!token) {
-              // Store current path for return after sign in
-              if (typeof window !== 'undefined' && window.location.pathname !== '/' && !window.location.pathname.startsWith('/sign-in')) {
-                sessionStorage.setItem('returnUrl', window.location.pathname);
-              }
-
-              // For mobile browsers, try to force a new sign-in session
-              if (isMobile) {
-                try {
-                  // Remove the current session
-                  await clerk.session?.remove();
-                  // Open sign-in with the current URL as return URL
-                  const returnUrl = window.location.pathname;
-                  await clerk.openSignIn({
-                    redirectUrl: returnUrl,
-                    appearance: {
-                      variables: {
-                        colorPrimary: '#0F172A',
-                      }
-                    }
-                  });
-                  return;
-                } catch (e) {
-                  console.warn('Failed to handle mobile sign-in:', e);
-                }
-              }
-
-              router.push('/sign-in');
-              return;
-            }
-
-            // Verify user matches
-            if (user.id !== initialUser.id) {
-              console.warn('User mismatch, redirecting to sign in');
-              if (typeof window !== 'undefined' && window.location.pathname !== '/' && !window.location.pathname.startsWith('/sign-in')) {
-                sessionStorage.setItem('returnUrl', window.location.pathname);
-              }
-              router.push('/sign-in');
-              return;
-            }
-
-            if (mounted) {
-              setIsValidated(true);
-            }
-          } catch (error) {
-            console.error('Token fetch failed:', error);
-            if (retryCount < maxRetries) {
-              retryCount++;
-              // Exponential backoff
-              const delay = Math.min(100 * Math.pow(2, retryCount), 1000);
-              retryTimeout = setTimeout(tryGetToken, delay);
-            } else {
-              throw error;
-            }
-          }
-        };
-
-        await tryGetToken();
-      } catch (error) {
-        console.error('Session validation failed:', error);
         if (mounted) {
-          // Store return URL before redirecting
-          if (typeof window !== 'undefined' && window.location.pathname !== '/' && !window.location.pathname.startsWith('/sign-in')) {
-            sessionStorage.setItem('returnUrl', window.location.pathname);
-          }
+          setIsValidating(false);
+        }
+      } catch (error) {
+        console.error('Error validating session:', error);
+        if (mounted) {
           router.push('/sign-in');
         }
       }
@@ -161,34 +82,35 @@ export function ProtectedPageWrapper({
 
     return () => {
       mounted = false;
-      if (retryTimeout) {
-        clearTimeout(retryTimeout);
-      }
     };
-  }, [isLoaded, isSignedIn, user, initialUser.id, router, getToken, clerk]);
+  }, [isLoaded, isSignedIn, router, getToken, initialUser]);
 
-  // Only show skeleton after a delay if still loading
+  // Only show skeleton after a delay if still validating and no initial data
   useEffect(() => {
+    if (!isValidating || initialUser) {
+      return;
+    }
+
     const timer = setTimeout(() => {
-      if (!isLoaded || !isValidated) {
+      if (isValidating && !initialUser) {
         setShouldShowSkeleton(true);
       }
-    }, 200); // Small delay to prevent flash
+    }, 500);
 
     return () => clearTimeout(timer);
-  }, [isLoaded, isValidated]);
+  }, [isValidating, initialUser]);
 
-  // Show nothing during initial load to prevent flash
-  if (!isLoaded || !isValidated) {
-    if (!shouldShowSkeleton) {
-      return null;
-    }
+  if (!shouldShowSkeleton && isValidating && !initialUser) {
+    return null;
+  }
+
+  if (shouldShowSkeleton && !initialUser) {
     return layoutType === "main" ? (
       <MainLayout>
         <LoadingSkeleton />
       </MainLayout>
     ) : (
-      <SubLayout title={title || ""}>
+      <SubLayout>
         <LoadingSkeleton />
       </SubLayout>
     );
