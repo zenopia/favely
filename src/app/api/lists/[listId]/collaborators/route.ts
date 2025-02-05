@@ -124,7 +124,6 @@ export async function POST(
     }
 
     const body = await req.json();
-    console.log("Request body:", body);
 
     const { type = 'user', targetUserId, userId, email, role = "viewer" } = body;
     // userId from the client might be a Clerk ID directly
