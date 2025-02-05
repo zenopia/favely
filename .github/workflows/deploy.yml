@@ -19,32 +19,10 @@ jobs:
         if [ "${{ github.ref }}" = "refs/heads/main" ]; then
           echo "host=favely.net" >> $GITHUB_OUTPUT
           echo "user=favely" >> $GITHUB_OUTPUT
-          echo "env_file=.env.production" >> $GITHUB_OUTPUT
         else
           echo "host=curate-dev.fileopia.com" >> $GITHUB_OUTPUT
           echo "user=fileopia-curate-dev" >> $GITHUB_OUTPUT
-          echo "env_file=.env.development" >> $GITHUB_OUTPUT
         fi
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-      env:
-        MONGODB_URI_V2: ${{ secrets.MONGODB_URI }}
-      
-    - name: Build
-      run: npm run build
-      env:
-        NODE_OPTIONS: '--max-old-space-size=4096'
-        MONGODB_URI_V2: ${{ secrets.MONGODB_URI }}
-
-    - name: Create deployment archive
-      run: tar -czf deployment.tar.gz .next node_modules package.json package-lock.json start.sh
     
     - name: Deploy
       uses: appleboy/ssh-action@v1.0.0
@@ -62,67 +40,19 @@ jobs:
           # Stop the application
           pm2 delete ${{ steps.set-target.outputs.host }} || true
           
-          # Backup current env file if it exists
-          if [ -f .env.development ]; then
-            cp .env.development .env.development.backup
-          fi
-          if [ -f .env.production ]; then
-            cp .env.production .env.production.backup
-          fi
+          # Stash any local changes
+          git stash
           
-          # Clean up while preserving env files and git directory
-          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.env.*' ! -name '*.backup' -exec rm -rf {} +
-
-    - name: Copy deployment files
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.SERVER_IP }}
-        username: ${{ steps.set-target.outputs.user }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        source: "deployment.tar.gz"
-        target: "/home/${{ steps.set-target.outputs.user }}/htdocs/${{ steps.set-target.outputs.host }}"
-
-    - name: Extract and start application
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.SERVER_IP }}
-        username: ${{ steps.set-target.outputs.user }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
-          # Load NVM and Node
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          # Pull latest changes
+          git pull origin ${{ github.ref_name }}
           
-          # Ensure PM2 is installed globally
-          if ! command -v pm2 &> /dev/null; then
-            npm install -g pm2
-          fi
+          # Install dependencies
+          npm ci
           
-          cd /home/${{ steps.set-target.outputs.user }}/htdocs/${{ steps.set-target.outputs.host }}
+          # Build the application
+          npm run build
           
-          # Extract deployment archive
-          tar -xzf deployment.tar.gz
-          rm deployment.tar.gz
-          
-          # Restore environment variables from backup if they exist
-          if [ -f .env.development.backup ]; then
-            mv .env.development.backup .env.development
-          fi
-          if [ -f .env.production.backup ]; then
-            mv .env.production.backup .env.production
-          fi
-          
-          # Ensure correct permissions
-          chmod +x start.sh
-          
-          # Start the application using full path if needed
-          if command -v pm2 &> /dev/null; then
-            pm2 start ecosystem.config.js
-            pm2 save
-          else
-            echo "ERROR: PM2 is not available in the path even after installation attempt"
-            exit 1
-          fi
+          # Start the application
+          pm2 start ecosystem.config.js
+          pm2 save
               
