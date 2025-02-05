@@ -91,6 +91,15 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         port: 22
         script: |
+          # Load NVM and Node
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          
+          # Ensure PM2 is installed globally
+          if ! command -v pm2 &> /dev/null; then
+            npm install -g pm2
+          fi
+          
           cd /home/${{ steps.set-target.outputs.user }}/htdocs/${{ steps.set-target.outputs.host }}
           
           # Extract deployment archive
@@ -108,7 +117,12 @@ jobs:
           # Ensure correct permissions
           chmod +x start.sh
           
-          # Start the application
-          pm2 start ecosystem.config.js
-          pm2 save
+          # Start the application using full path if needed
+          if command -v pm2 &> /dev/null; then
+            pm2 start ecosystem.config.js
+            pm2 save
+          else
+            echo "ERROR: PM2 is not available in the path even after installation attempt"
+            exit 1
+          fi
               
