@@ -29,6 +29,7 @@ interface PaginatedListsResponse {
   lists: EnhancedList[];
   nextCursor?: string;
   hasMore: boolean;
+  lastViewedMap?: Record<string, Date>;
 }
 
 export async function getEnhancedLists(
@@ -218,7 +219,8 @@ export async function getEnhancedLists(
   return {
     lists: enhancedLists,
     nextCursor: hasMore ? limitedLists[limitedLists.length - 1]._id.toString() : undefined,
-    hasMore
+    hasMore,
+    lastViewedMap
   };
 }
 

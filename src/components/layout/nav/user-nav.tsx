@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, Settings, LogOut } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Portal } from "@radix-ui/react-portal";
 import { cn } from "@/lib/utils";
 import { useAuthService } from "@/lib/services/auth.service";
@@ -12,6 +12,7 @@ import { useAuthService } from "@/lib/services/auth.service";
 export function UserNav() {
   const { isSignedIn, isLoaded, user, signOut } = useAuthService();
   const [open, setOpen] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const initials = useMemo(() => {
     if (!user?.fullName && !user?.username) return "U";
@@ -23,6 +24,15 @@ export function UserNav() {
           .toUpperCase()
       : user.username?.[0]?.toUpperCase() || "U";
   }, [user?.fullName, user?.username]);
+
+  // Preload the avatar image
+  useEffect(() => {
+    if (user?.imageUrl) {
+      const img = new Image();
+      img.src = user.imageUrl;
+      img.onload = () => setImageLoaded(true);
+    }
+  }, [user?.imageUrl]);
 
   if (!isLoaded) {
     return (
@@ -46,12 +56,16 @@ export function UserNav() {
         onClick={() => setOpen(true)}
       >
         <Avatar className="h-8 w-8">
-          <AvatarImage 
-            src={user.imageUrl || undefined} 
-            alt={user.fullName || user.username || ""}
-            loading="eager"
-          />
-          <AvatarFallback>{initials}</AvatarFallback>
+          {user.imageUrl && imageLoaded ? (
+            <AvatarImage 
+              src={user.imageUrl}
+              alt={user.fullName || user.username || ""}
+              loading="eager"
+              className="object-cover"
+            />
+          ) : (
+            <AvatarFallback>{initials}</AvatarFallback>
+          )}
         </Avatar>
       </Button>
 
@@ -76,12 +90,16 @@ export function UserNav() {
             <div className="flex flex-col h-full">
               <div className="flex flex-col items-end space-y-2 mb-6">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage 
-                    src={user.imageUrl || undefined} 
-                    alt={user.fullName || user.username || ""}
-                    loading="eager"
-                  />
-                  <AvatarFallback>{initials}</AvatarFallback>
+                  {user.imageUrl && imageLoaded ? (
+                    <AvatarImage 
+                      src={user.imageUrl}
+                      alt={user.fullName || user.username || ""}
+                      loading="eager"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <AvatarFallback>{initials}</AvatarFallback>
+                  )}
                 </Avatar>
                 <div className="flex flex-col items-end">
                   <p className="text-sm font-medium leading-none">{user.fullName || user.username}</p>

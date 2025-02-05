@@ -43,6 +43,14 @@ const transformUser = (user: any): AuthUser => ({
   imageUrl: user.imageUrl,
 });
 
+// Add cache configuration
+const CACHE_TTL = 60 * 1000; // 1 minute
+type CacheEntry = {
+  data: AuthUser | null;
+  timestamp: number;
+};
+const userCache = new Map<string, CacheEntry>();
+
 export class AuthService {
   static async getCurrentUser(userId?: string | null): Promise<AuthUser | null> {
     // If userId is not provided, try to get it from auth context
@@ -54,7 +62,6 @@ export class AuthService {
           userId = authUserId;
         }
       } catch (error) {
-        // If getAuth fails, return null
         console.debug('Failed to get auth:', error);
         return null;
       }
@@ -62,15 +69,23 @@ export class AuthService {
 
     if (!userId) return null;
 
+    // Check cache first
+    const cached = userCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+
     // If we're in a browser environment, fetch through the API
     if (typeof window !== 'undefined') {
       try {
         const response = await fetch('/api/users/me', {
-          // Add cache: no-store to prevent caching issues
           cache: 'no-store'
         });
         if (!response.ok) return null;
-        return response.json();
+        const data = await response.json();
+        // Update cache
+        userCache.set(userId, { data, timestamp: Date.now() });
+        return data;
       } catch (error) {
         console.error("Error fetching current user:", error);
         return null;
@@ -86,7 +101,10 @@ export class AuthService {
         USER_PROJECTION
       ).lean();
       
-      return user ? transformUser(user) : null;
+      const transformedUser = user ? transformUser(user) : null;
+      // Update cache
+      userCache.set(userId, { data: transformedUser, timestamp: Date.now() });
+      return transformedUser;
     });
   }
 
