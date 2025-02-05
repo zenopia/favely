@@ -44,12 +44,17 @@ const transformUser = (user: any): AuthUser => ({
 });
 
 // Add cache configuration
-const CACHE_TTL = 60 * 1000; // 1 minute
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 type CacheEntry = {
   data: AuthUser | null;
   timestamp: number;
 };
+
+// Global cache for both server and client
 const userCache = new Map<string, CacheEntry>();
+
+// Global promise cache to prevent duplicate in-flight requests
+const requestCache = new Map<string, Promise<AuthUser | null>>();
 
 export class AuthService {
   static async getCurrentUser(userId?: string | null): Promise<AuthUser | null> {
@@ -69,43 +74,55 @@ export class AuthService {
 
     if (!userId) return null;
 
-    // Check cache first
+    // Check memory cache first
     const cached = userCache.get(userId);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return cached.data;
     }
 
-    // If we're in a browser environment, fetch through the API
-    if (typeof window !== 'undefined') {
-      try {
-        const response = await fetch('/api/users/me', {
-          cache: 'no-store'
-        });
-        if (!response.ok) return null;
-        const data = await response.json();
-        // Update cache
-        userCache.set(userId, { data, timestamp: Date.now() });
-        return data;
-      } catch (error) {
-        console.error("Error fetching current user:", error);
-        return null;
-      }
+    // Check if there's an in-flight request
+    const pendingRequest = requestCache.get(userId);
+    if (pendingRequest) {
+      return pendingRequest;
     }
 
-    // Server-side: direct DB access with retry
-    return withRetry(async () => {
-      await connectToMongoDB();
-      const UserModel = await getUserModel();
-      const user = await UserModel.findOne(
-        { clerkId: userId },
-        USER_PROJECTION
-      ).lean();
-      
-      const transformedUser = user ? transformUser(user) : null;
-      // Update cache
-      userCache.set(userId, { data: transformedUser, timestamp: Date.now() });
-      return transformedUser;
-    });
+    // Create new request promise
+    const request = (async () => {
+      try {
+        let userData: AuthUser | null = null;
+
+        // If we're in a browser environment, fetch through the API
+        if (typeof window !== 'undefined') {
+          const response = await fetch('/api/users/me', {
+            cache: 'no-store'
+          });
+          if (response.ok) {
+            userData = await response.json();
+          }
+        } else {
+          // Server-side: direct DB access with retry
+          await connectToMongoDB();
+          const UserModel = await getUserModel();
+          const user = await UserModel.findOne(
+            { clerkId: userId },
+            USER_PROJECTION
+          ).lean();
+          
+          userData = user ? transformUser(user) : null;
+        }
+
+        // Update cache
+        userCache.set(userId, { data: userData, timestamp: Date.now() });
+        return userData;
+      } finally {
+        // Clean up request cache
+        requestCache.delete(userId);
+      }
+    })();
+
+    // Store the promise in the request cache
+    requestCache.set(userId, request);
+    return request;
   }
 
   static async getUserByUsername(username: string): Promise<AuthUser | null> {
@@ -181,17 +198,13 @@ export class AuthService {
     const [isLoading, setIsLoading] = React.useState(true);
 
     React.useEffect(() => {
-      // Only run on the client side
       if (typeof window === 'undefined') return;
-
       let mounted = true;
 
       const fetchUser = async () => {
         try {
           if (isSignedIn && clerk.session?.id) {
-            const response = await fetch('/api/users/me');
-            if (!response.ok) throw new Error('Failed to fetch user');
-            const userData = await response.json();
+            const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
             if (mounted) setUser(userData);
           } else {
             if (mounted) setUser(null);
@@ -217,6 +230,9 @@ export class AuthService {
       try {
         await clerk.signOut();
         setUser(null);
+        // Clear cache on sign out
+        userCache.clear();
+        requestCache.clear();
       } catch (error) {
         console.error('Error signing out:', error);
       }
@@ -237,13 +253,6 @@ export function useAuthService() {
   const clerk = useClerk();
   const [user, setUser] = React.useState<AuthUser | null>(null);
   const [isInitialLoad, setIsInitialLoad] = React.useState(true);
-
-  // Cache user data in memory
-  const userCache = React.useRef<{
-    id: string;
-    data: AuthUser;
-    timestamp: number;
-  } | null>(null);
 
   // Get token with retry logic
   const getToken = React.useCallback(async () => {
@@ -309,30 +318,10 @@ export function useAuthService() {
       }
 
       try {
-        // Check cache first
-        if (userCache.current && 
-            userCache.current.id === clerk.session.user?.id &&
-            Date.now() - userCache.current.timestamp < 5 * 60 * 1000) { // 5 minutes cache
-          if (isMounted) {
-            setUser(userCache.current.data);
-            setIsInitialLoad(false);
-          }
-          return;
-        }
-
         const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
         if (isMounted) {
           setUser(userData);
           setIsInitialLoad(false);
-          
-          // Update cache
-          if (userData) {
-            userCache.current = {
-              id: clerk.session.user?.id as string,
-              data: userData,
-              timestamp: Date.now()
-            };
-          }
         }
       } catch (error) {
         console.error('[Auth] Error fetching user data:', error);
@@ -354,7 +343,8 @@ export function useAuthService() {
 
   // Clear cache on sign out
   const handleSignOut = React.useCallback(async () => {
-    userCache.current = null;
+    userCache.clear();
+    requestCache.clear();
     setUser(null);
     await clerkSignOut();
   }, [clerkSignOut]);
@@ -366,4 +356,6 @@ export function useAuthService() {
     signOut: handleSignOut,
     getToken
   };
-} 
+}
+
+// Remove the duplicate useAuthService hook since it's redundant with useAuth 

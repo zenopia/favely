@@ -8,7 +8,8 @@ export const authConfig: AuthProviderConfig = {
     "/search",
     "/lists/:path*",
     "/api/lists/:path*",
-    "/api/users/:path*",
+    "/api/users/:username", // Public user profile endpoint
+    "/api/users/:username/follow/status", // Allow checking follow status
     "/api/webhooks/clerk",
     "/api/webhooks/user",
     "/manifest.json",
@@ -33,15 +34,17 @@ export const authConfig: AuthProviderConfig = {
     "/profile/settings",
     "/create",
     "/lists/create",
-    "/lists/edit/:listId"
+    "/lists/edit/:listId",
+    "/api/users/:username/follow" // Protect follow/unfollow endpoint
   ],
   apiConfig: {
     publicPaths: [
       "/api/health",
       "/api/webhooks/clerk",
       "/api/webhooks/user",
-      "/api/lists/[^/]+$", // Individual list endpoints
-      "/api/users/[^/]+$", // Public user profile endpoints
+      "/api/lists/:listId", // Individual list endpoints
+      "/api/users/:username", // Public user profile endpoints
+      "/api/users/:username/follow/status", // Allow checking follow status
       "/api/search"
     ],
     protectedPaths: [
@@ -49,7 +52,8 @@ export const authConfig: AuthProviderConfig = {
       "/api/lists/edit",
       "/api/lists/delete",
       "/api/profile",
-      "/api/collaborations"
+      "/api/collaborations",
+      "/api/users/:username/follow" // Protect follow/unfollow endpoint
     ]
   }
 }; 

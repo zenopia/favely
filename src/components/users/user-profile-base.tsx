@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 export interface UserProfileBaseProps {
   // Core user data
   username: string;
+  fullName?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   imageUrl?: string | null;
@@ -49,9 +50,10 @@ export interface UserProfileBaseProps {
   actions?: React.ReactNode;
 }
 
-export function formatDisplayName(firstName: string | null | undefined, lastName: string | null | undefined, username: string): string {
-  const fullName = [firstName, lastName].filter(Boolean).join(' ');
-  return fullName || username;
+export function formatDisplayName(firstName: string | null | undefined, lastName: string | null | undefined, username: string, fullName?: string | null): string {
+  if (fullName) return fullName;
+  const constructedName = [firstName, lastName].filter(Boolean).join(' ');
+  return constructedName || username;
 }
 
 function calculateAge(dateOfBirth: Date): number {
@@ -66,6 +68,7 @@ function calculateAge(dateOfBirth: Date): number {
 
 export function UserProfileBase({
   username,
+  fullName,
   firstName,
   lastName,
   imageUrl,
@@ -88,7 +91,7 @@ export function UserProfileBase({
   showEditButton = false,
   actions,
 }: UserProfileBaseProps) {
-  const displayName = formatDisplayName(firstName, lastName, username);
+  const displayName = formatDisplayName(firstName, lastName, username, fullName);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const fromParam = searchParams.get('from');

@@ -60,6 +60,7 @@ export function UserProfile({
   return (
     <UserProfileBase
       username={username}
+      fullName={fullName}
       firstName={firstName}
       lastName={lastName}
       bio={bio}
