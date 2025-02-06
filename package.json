@@ -22,10 +22,10 @@
     "test:perf": "jest src/lib/services/__tests__/auth.service.perf.test.ts --runInBand"
   },
   "dependencies": {
-    "@clerk/backend": "^0.38.0",
-    "@clerk/nextjs": "^4.29.9",
-    "@clerk/themes": "^1.7.9",
-    "@clerk/types": "^3.60.0",
+    "@clerk/backend": "^1.23.11",
+    "@clerk/nextjs": "^5.7.5",
+    "@clerk/themes": "^1.7.19",
+    "@clerk/types": "^3.65.4",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-alert-dialog": "^1.1.2",

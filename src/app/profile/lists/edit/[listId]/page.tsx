@@ -3,6 +3,7 @@ import { AuthService } from "@/lib/services/auth.service";
 import { ListFormContent } from "@/components/lists/list-form-content";
 import { ProtectedPageWrapper } from "@/components/auth/protected-page-wrapper";
 import { getList } from "@/lib/actions/list";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   params: {
@@ -14,7 +15,7 @@ interface PageProps {
 }
 
 export default async function EditListPage({ params, searchParams }: PageProps) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect('/sign-in');
   }

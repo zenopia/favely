@@ -1,8 +1,12 @@
-import { auth as getAuth, clerkClient } from "@clerk/nextjs/server";
+import { auth as getAuth } from "@clerk/nextjs/server";
+import { clerkClient as createClerkClient } from "@clerk/nextjs/server";
 import type { User } from "@clerk/backend";
 import { AuthUser } from "@/types/auth";
 import { BaseAuthProvider } from "../base-provider";
 import { AuthResult } from "../types";
+
+// Get the client instance
+const clerkClient = createClerkClient();
 
 export class ClerkAuthProvider extends BaseAuthProvider {
   async getCurrentUser(): Promise<AuthUser | null> {

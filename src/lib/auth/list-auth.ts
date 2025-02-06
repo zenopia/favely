@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { getListModel } from "@/lib/db/models-v2/list";
 import { connectToMongoDB } from "@/lib/db/client";
 import { MongoListDocument } from "@/types/mongo";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export async function getAuthorizedList(listId: string): Promise<MongoListDocument> {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     notFound();
   }
@@ -30,7 +31,7 @@ export async function getAuthorizedList(listId: string): Promise<MongoListDocume
 }
 
 export async function getAuthorizedListForView(listId: string): Promise<MongoListDocument> {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
 
   await connectToMongoDB();
   const ListModel = await getListModel();

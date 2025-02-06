@@ -13,20 +13,18 @@ interface User {
   id: string;
   username: string;
   displayName: string;
-  imageUrl?: string;
-  avatarUrl?: string;
+  imageUrl: string | null;
 }
 
 interface ApiUser {
   id: string;
   username: string;
   displayName: string;
-  imageUrl?: string;
-  avatarUrl?: string;
+  imageUrl: string | null;
 }
 
 interface UserComboboxProps {
-  onSelect: (value: { type: 'user', userId: string, username: string } | { type: 'email', email: string, note?: string }) => void;
+  onSelect: (value: { type: 'user', userId: string, username: string, displayName: string, imageUrl: string | null } | { type: 'email', email: string, note?: string }) => void;
   placeholder?: string;
   disabled?: boolean;
   userIds?: string[];
@@ -52,15 +50,15 @@ export function UserCombobox({
   // Set initial users from the useUsers hook
   React.useEffect(() => {
     if (initialUsers && !searchValue) {
-      setUsers(initialUsers
+      const mappedUsers = initialUsers
         .filter(user => !excludeUserIds.includes(user.id))
         .map(user => ({
-          id: user.id,
-          username: user.username,
-          displayName: user.displayName,
-          imageUrl: user.imageUrl || undefined
-        }))
-      );
+          id: user.id || '',
+          username: user.username || '',
+          displayName: user.displayName || user.username || '',
+          imageUrl: user.imageUrl
+        }));
+      setUsers(mappedUsers);
     }
   }, [initialUsers, searchValue, excludeUserIds]);
 
@@ -73,10 +71,10 @@ export function UserCombobox({
           setUsers(initialUsers
             .filter(user => !excludeUserIds.includes(user.id))
             .map(user => ({
-              id: user.id,
-              username: user.username,
-              displayName: user.displayName,
-              imageUrl: user.imageUrl || undefined
+              id: user.id || '',
+              username: user.username || '',
+              displayName: user.displayName || user.username || '',
+              imageUrl: user.imageUrl
             }))
           );
         }
@@ -92,16 +90,14 @@ export function UserCombobox({
              user.displayName.toLowerCase().includes(searchValue.toLowerCase()))
           )
           .map(user => ({
-            id: user.id,
-            username: user.username,
-            displayName: user.displayName,
-            imageUrl: user.imageUrl || undefined
+            id: user.id || '',
+            username: user.username || '',
+            displayName: user.displayName || user.username || '',
+            imageUrl: user.imageUrl
           }));
 
-        setUsers(localMatches);
-
-        // If we have local matches, don't make an API call
         if (localMatches.length > 0) {
+          setUsers(localMatches);
           return;
         }
       }
@@ -110,32 +106,27 @@ export function UserCombobox({
       try {
         setIsLoading(true);
         const response = await fetch(`/api/users/search?q=${encodeURIComponent(searchValue)}`);
-        if (!response.ok) throw new Error();
-        const { users: data } = await response.json();
+        if (!response.ok) throw new Error('Failed to fetch users');
+        const data = await response.json();
 
-        // Debug log to see what we're getting from the API
-        console.log("Search API response:", data);
+        if (!data.users) {
+          setUsers([]);
+          return;
+        }
 
-        const mappedUsers = data
-          .filter((user: ApiUser) => !excludeUserIds.includes(user.id))
-          .map((user: ApiUser) => {
-            // Log the raw user data from API
-            console.log("Raw user from API:", user);
-            
-            const mappedUser = {
-              id: user.id,
-              username: user.username,
-              displayName: user.displayName,
-              imageUrl: user.imageUrl,
-              avatarUrl: user.avatarUrl
-            };
-            console.log("Mapped user:", mappedUser);
-            return mappedUser;
-          });
+        const mappedUsers = data.users
+          .filter((user: ApiUser) => user.id && !excludeUserIds.includes(user.id))
+          .map((user: ApiUser) => ({
+            id: user.id,
+            username: user.username || '',
+            displayName: user.displayName || user.username || '',
+            imageUrl: user.imageUrl
+          }));
 
         setUsers(mappedUsers);
       } catch (error) {
         console.error('Failed to search users:', error);
+        setUsers([]);
       } finally {
         setIsLoading(false);
       }
@@ -146,7 +137,18 @@ export function UserCombobox({
   }, [searchValue, initialUsers, excludeUserIds]);
 
   const handleSelect = (user: User) => {
-    onSelect({ type: 'user', userId: user.id, username: user.username });
+    if (!user.id) {
+      console.error('Cannot select user without ID:', user);
+      return;
+    }
+
+    onSelect({ 
+      type: 'user', 
+      userId: user.id, 
+      username: user.username || '',
+      displayName: user.displayName || user.username || '',
+      imageUrl: user.imageUrl
+    });
     setSearchValue("");
     setShowDropdown(false);
   };
@@ -205,7 +207,7 @@ export function UserCombobox({
                         aria-selected={false}
                       >
                         <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.avatarUrl || user.imageUrl} alt={user.username} />
+                          <AvatarImage src={user.imageUrl || undefined} alt={user.username} />
                           <AvatarFallback>
                             {user.username.slice(0, 2).toUpperCase()}
                           </AvatarFallback>

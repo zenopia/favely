@@ -5,6 +5,7 @@ import connectToMongoDB from '../../db/mongodb';
 import mongoose, { Document } from 'mongoose';
 import type { UserDocument } from '../../db/models-v2/user';
 import { getUserModel } from '../../db/models-v2/user';
+import { AuthServerService } from "@/lib/services/auth.server";
 
 const TEST_TIMEOUT = 30000; // 30 seconds
 
@@ -26,7 +27,7 @@ describe('AuthService Performance Tests', () => {
 
     const result = await runConcurrentTests(
       'getCurrentUser',
-      () => AuthService.getCurrentUser(userId),
+      () => AuthServerService.getCurrentUser(userId),
       20, // Test with 20 concurrent requests
       50  // 50ms delay between requests
     );
@@ -45,7 +46,7 @@ describe('AuthService Performance Tests', () => {
 
     const result = await runConcurrentTests(
       'getUserByUsername',
-      () => AuthService.getUserByUsername(username),
+      () => AuthServerService.getUserByUsername(username),
       20,
       50
     );
@@ -63,7 +64,7 @@ describe('AuthService Performance Tests', () => {
 
     const result = await runConcurrentTests(
       'getUserByEmail',
-      () => AuthService.getUserByEmail(email),
+      () => AuthServerService.getUserByEmail(email),
       20,
       50
     );
@@ -81,7 +82,7 @@ describe('AuthService Performance Tests', () => {
 
     const result = await runConcurrentTests(
       'batchGetUsers',
-      () => Promise.all(userIds.map((id: string) => AuthService.getCurrentUser(id))),
+      () => Promise.all(userIds.map((id: string) => AuthServerService.getCurrentUser(id))),
       10, // Lower concurrency due to multiple requests per operation
       100
     );

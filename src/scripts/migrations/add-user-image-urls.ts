@@ -1,8 +1,9 @@
-import { clerkClient } from "@clerk/clerk-sdk-node";
-import { connectToDatabase } from "@/lib/db/mongodb";
+import { clerkClient as createClerkClient } from "@clerk/nextjs/server";
+import connectToDatabase from "@/lib/db/mongodb";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import * as dotenv from 'dotenv';
 import path from 'path';
+import { ClerkService } from "@/lib/services/authProvider.service";
 
 // Determine which env file to use
 const envFile = process.env.ENV_FILE || '.env.local';
@@ -10,6 +11,9 @@ const envPath = path.resolve(process.cwd(), envFile);
 
 console.log(`Loading environment from: ${envPath}`);
 dotenv.config({ path: envPath });
+
+// Get the client instance
+const clerkClient = createClerkClient();
 
 async function migrateUserImageUrls() {
   try {
@@ -51,37 +55,32 @@ async function migrateUserImageUrls() {
       try {
         // Fetch users from Clerk
         const clerkUsers = await clerkClient.users.getUserList({
-          userId: clerkIds
+          userId: clerkIds,
         });
 
-        // Create a map of Clerk IDs to image URLs
-        const imageUrlMap = new Map(
-          clerkUsers.map(user => [user.id, user.imageUrl])
+        // Create a map of Clerk users for quick lookup
+        const clerkUserMap = new Map(
+          // Handle both array and paginated response
+          (Array.isArray(clerkUsers) ? clerkUsers : clerkUsers.data).map((u: any) => [u.id, u])
         );
 
-        // Update each user in the batch
-        const updatePromises = batch.map(async (user) => {
-          const imageUrl = imageUrlMap.get(user.clerkId);
-          
-          if (!imageUrl) {
-            console.log(`No image URL found for user ${user.clerkId}`);
-            stats.notFound++;
-            return;
+        // Update users with image URLs
+        const bulkOps = batch.map((user) => ({
+          updateOne: {
+            filter: { _id: user._id },
+            update: {
+              $set: {
+                imageUrl: (clerkUserMap.get(user.clerkId) as { imageUrl?: string } | undefined)?.imageUrl ?? null,
+              }
+            }
           }
+        }));
 
-          try {
-            await UserModel.updateOne(
-              { clerkId: user.clerkId },
-              { $set: { imageUrl } }
-            );
-            stats.updated++;
-          } catch (error) {
-            console.error(`Error updating user ${user.clerkId}:`, error);
-            stats.failed++;
-          }
-        });
-
-        await Promise.all(updatePromises);
+        if (bulkOps.length > 0) {
+          await UserModel.bulkWrite(bulkOps);
+          console.log(`Updated ${bulkOps.length} users with image URLs`);
+          stats.updated += bulkOps.length;
+        }
         
         // Log progress
         console.log(`Processed ${Math.min(i + batchSize, dbUsers.length)}/${dbUsers.length} users`);

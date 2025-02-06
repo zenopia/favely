@@ -5,8 +5,6 @@ import useSWR from "swr";
 interface UserData {
   id: string;
   username: string;
-  firstName: string | null;
-  lastName: string | null;
   displayName: string;
   imageUrl: string | null;
 }
@@ -14,8 +12,6 @@ interface UserData {
 interface UserResponse {
   id: string;
   username: string;
-  firstName: string | null;
-  lastName: string | null;
   displayName: string;
   imageUrl: string | null;
 }
@@ -30,7 +26,7 @@ interface UseUsersReturn {
 const userCache = new Map<string, { data: UserData; timestamp: number }>();
 const CACHE_DURATION = 60000; // 1 minute cache duration
 
-// Function to get cached users and identify which ones need to be fetched
+// Function to get cached and missing users
 function getCachedAndMissingUsers(userIdentifiers: string[]) {
   const now = Date.now();
   const cachedUsers: UserData[] = [];
@@ -80,10 +76,8 @@ const fetcher = async (key: string): Promise<UserData[]> => {
   const transformedUsers = users.map((user: UserResponse): UserData => {
     const userData: UserData = {
       id: user.id,
-      username: user.username,
-      firstName: user.firstName || null,
-      lastName: user.lastName || null,
-      displayName: user.displayName || user.username,
+      username: user.username || '',
+      displayName: user.displayName || user.username || '',
       imageUrl: user.imageUrl
     };
     
@@ -110,8 +104,6 @@ const fetcher = async (key: string): Promise<UserData[]> => {
       return {
         id,
         username: 'Unknown User',
-        firstName: null,
-        lastName: null,
         displayName: 'Unknown User',
         imageUrl: null
       };

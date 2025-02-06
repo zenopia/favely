@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface RouteParams {
   username: string;
@@ -12,7 +13,7 @@ export async function POST(
   { params }: { params: RouteParams }
 ) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -103,7 +104,7 @@ export async function DELETE(
   { params }: { params: RouteParams }
 ) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },

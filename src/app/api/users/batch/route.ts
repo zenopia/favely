@@ -8,10 +8,7 @@ interface UserResponse {
   id: string;
   username: string;
   displayName: string;
-  bio: string;
   imageUrl: string | null;
-  followersCount: number;
-  followingCount: number;
 }
 
 interface ErrorResponse {
@@ -38,22 +35,24 @@ export async function POST(
     const users = await UserModel.find({
       clerkId: { $in: userIds }
     })
-      .select("clerkId username displayName bio imageUrl followersCount followingCount")
+      .select("clerkId username displayName imageUrl")
       .lean();
 
-    // Create map for quick lookup
-    const userMap = new Map(users.map(user => [user.clerkId, {
-      id: user.clerkId,
-      username: user.username,
-      displayName: user.displayName,
-      bio: user.bio || "",
-      imageUrl: user.imageUrl || null,
-      followersCount: user.followersCount || 0,
-      followingCount: user.followingCount || 0
-    }]));
-
-    // Convert map to array in the same order as requested
-    const result = userIds.map(id => userMap.get(id)).filter(Boolean);
+    // Transform users for response
+    const result = userIds.map(id => {
+      const user = users.find(u => u.clerkId === id);
+      return user ? {
+        id: user.clerkId,
+        username: user.username || '',
+        displayName: user.displayName || user.username || '',
+        imageUrl: user.imageUrl || null
+      } : {
+        id,
+        username: 'Unknown User',
+        displayName: 'Unknown User',
+        imageUrl: null
+      };
+    });
 
     return NextResponse.json<UserResponse[]>(result);
   } catch (error) {

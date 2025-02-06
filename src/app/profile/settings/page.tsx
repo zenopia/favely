@@ -5,9 +5,10 @@ import { getUserModel } from "@/lib/db/models-v2/user";
 import { getUserProfileModel } from "@/lib/db/models-v2/user-profile";
 import { PrivacySettingsForm } from "@/components/settings/privacy-settings-form";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export default async function SettingsPage() {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect('/sign-in');
   }

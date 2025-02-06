@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getListModel, ListDocument, ListCollaborator } from "@/lib/db/models-v2/list";
 import { getUserModel, UserDocument } from "@/lib/db/models-v2/user";
-import { clerkClient } from "@clerk/clerk-sdk-node";
 import { Types } from "mongoose";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
+import { ClerkService } from "@/lib/services/authProvider.service";
 
 interface RouteParams {
   listId: string;
@@ -47,7 +48,7 @@ export async function GET(
   { params }: { params: RouteParams }
 ): Promise<NextResponse<CollaboratorsResponse | ErrorResponse>> {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json<ErrorResponse>(
         { error: "Unauthorized" },
@@ -97,7 +98,7 @@ export async function DELETE(
   { params }: { params: RouteParams }
 ): Promise<NextResponse<SuccessResponse | ErrorResponse>> {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json<ErrorResponse>(
         { error: "Unauthorized" },
@@ -157,7 +158,7 @@ export async function PATCH(
   { params }: { params: RouteParams }
 ): Promise<NextResponse<CollaboratorsResponse | ErrorResponse>> {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json<ErrorResponse>(
         { error: "Unauthorized" },
@@ -227,7 +228,7 @@ export async function PUT(
   { params }: { params: RouteParams }
 ): Promise<NextResponse<SuccessResponse | ErrorResponse>> {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json<ErrorResponse>(
         { error: "Unauthorized" },

@@ -4,6 +4,7 @@ import { connectToMongoDB } from "@/lib/db/client";
 import { getListModel, type ListDocument, type ListCollaborator } from "@/lib/db/models-v2/list";
 import type { ListItem } from "@/types/list";
 import { Types } from "mongoose";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 // Helper function to convert mongoose list item to external ListItem interface
 function convertToListItem(mongoItem: { title: string; comment?: string; rank: number; properties?: Array<{ type?: 'text' | 'link'; label: string; value: string; }> }): ListItem {
@@ -26,7 +27,7 @@ export async function GET(
   { params }: { params: { username: string; listId: string; itemId: string } }
 ) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     await connectToMongoDB();
     const ListModel = await getListModel();
 
@@ -70,7 +71,7 @@ export async function PATCH(
   { params }: { params: { username: string; listId: string; itemId: string } }
 ) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
@@ -135,7 +136,7 @@ export async function DELETE(
   { params }: { params: { username: string; listId: string; itemId: string } }
 ) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }

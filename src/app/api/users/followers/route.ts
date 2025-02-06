@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
-import { clerkClient } from "@clerk/clerk-sdk-node";
 import { withAuth, getUserId } from "@/lib/auth/api-utils";
+import { ClerkService } from "@/lib/services/authProvider.service";
 
 export const dynamic = 'force-dynamic';
 
@@ -30,51 +30,48 @@ export const GET = withAuth(async (req: NextRequest) => {
     ]);
 
     // Get follower details
-    const followerIds = followers.map((f) => f.followerId);
+    const followerIds = followers.map((f: { followerId: string }) => f.followerId);
     const [followerDetails, clerkUsers] = await Promise.all([
       UserModel.find({
         clerkId: { $in: followerIds }
       })
         .select("username displayName bio followersCount followingCount")
         .lean(),
-      clerkClient.users.getUserList({
-        userId: followerIds,
-      })
+      ClerkService.getUserList(followerIds)
     ]);
 
     // Create maps for quick lookup
     const followerMap = new Map(
-      followerDetails.map((f) => [f.clerkId, f])
+      followerDetails.map((f: { clerkId: string }) => [f.clerkId, f])
     );
     const clerkUserMap = new Map(
       clerkUsers.map((u) => [u.id, u])
     );
 
-    // Combine follow data with user details
-    const enhancedFollowers = followers.map((follow) => {
-      const follower = followerMap.get(follow.followerId);
-      const clerkUser = clerkUserMap.get(follow.followerId);
+    // Combine the data
+    const combinedFollowers = followerDetails.map((follower: {
+      _id: string;
+      clerkId: string;
+      username: string;
+      displayName: string;
+      bio: string;
+      followersCount: number;
+      followingCount: number;
+    }) => {
+      const clerkUser = clerkUserMap.get(follower.clerkId);
       return {
-        id: follow._id.toString(),
-        followerId: follow.followerId,
-        followingId: follow.followingId,
-        createdAt: follow.createdAt,
-        follower: follower
-          ? {
-              id: follower._id.toString(),
-              username: follower.username,
-              displayName: follower.displayName,
-              bio: follower.bio || "",
-              imageUrl: clerkUser?.imageUrl || null,
-              followersCount: follower.followersCount || 0,
-              followingCount: follower.followingCount || 0
-            }
-          : null
+        _id: follower._id,
+        username: follower.username,
+        displayName: follower.displayName,
+        bio: follower.bio,
+        imageUrl: clerkUser?.imageUrl ?? null,
+        followersCount: follower.followersCount,
+        followingCount: follower.followingCount,
       };
     });
 
     return NextResponse.json({
-      followers: enhancedFollowers,
+      followers: combinedFollowers,
       total,
       page,
       pageSize: limit

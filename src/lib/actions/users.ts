@@ -5,6 +5,7 @@ import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { getUserProfileModel } from "@/lib/db/models-v2/user-profile";
 import { getUserCacheModel } from "@/lib/db/models-v2/user-cache";
 import { MongoUserDocument } from "@/types/mongo";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export interface EnhancedUser {
   id: string;
@@ -19,7 +20,7 @@ export interface EnhancedUser {
 export async function getEnhancedUsers(filter: any = {}, options: { sort?: any } = {}): Promise<EnhancedUser[]> {
   let user = null;
   try {
-    user = await AuthService.getCurrentUser();
+    user = await AuthServerService.getCurrentUser();
   } catch (error) {
     // Ignore auth errors - function should work without authentication
     console.debug('No authenticated user found');

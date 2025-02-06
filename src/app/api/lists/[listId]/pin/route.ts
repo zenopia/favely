@@ -4,6 +4,7 @@ import { getListModel } from "@/lib/db/models-v2/list";
 import { getPinModel } from "@/lib/db/models-v2/pin";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export async function POST(
   { params }: { params: RouteParams }
 ) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },

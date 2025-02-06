@@ -1,7 +1,6 @@
 "use server";
 
-import { AuthService } from "@/lib/services/auth.service";
-import { clerkClient, User } from "@clerk/clerk-sdk-node";
+import type { ClerkUser as User } from "@clerk/nextjs/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getListModel } from "@/lib/db/models-v2/list";
 import { getUserCacheModel } from "@/lib/db/models-v2/user-cache";
@@ -11,6 +10,8 @@ import { FilterQuery, Types, QueryOptions } from "mongoose";
 import { EnhancedList, List, ListItem, ListCollaborator } from "@/types/list";
 import { MongoListDocument } from "@/types/mongo";
 import { connectToDatabase } from "@/lib/db";
+import { AuthServerService } from "@/lib/services/auth.server";
+import { ClerkService } from "@/lib/services/authProvider.service";
 
 interface ListViewDocument {
   listId: Types.ObjectId;
@@ -38,7 +39,7 @@ export async function getEnhancedLists(
   cursor?: string,
   limit: number = 20
 ): Promise<PaginatedListsResponse> {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   await connectToMongoDB();
 
   // If cursor is provided, add it to the query
@@ -81,42 +82,30 @@ export async function getEnhancedLists(
 
   // Fetch missing users from Clerk and update cache
   if (missingUserIds.length > 0) {
-    const clerkUsers = await clerkClient.users.getUserList({
-      userId: missingUserIds,
-    });
+    const clerkUsers = await ClerkService.getUserList(missingUserIds);
 
-    // Prepare bulk write operations for cache updates
-    const bulkOps = clerkUsers.map((user: User) => ({
-      updateOne: {
-        filter: { clerkId: user.id },
-        update: {
-          $set: {
-            clerkId: user.id,
-            username: user.username || '',
-            displayName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || '',
-            imageUrl: user.imageUrl,
-            lastSynced: new Date()
-          }
-        },
-        upsert: true
-      }
-    }));
-
-    // Update cache
-    if (bulkOps.length > 0) {
-      await UserCacheModel.bulkWrite(bulkOps);
-    }
-
-    // Add fresh users to userCaches
-    const freshUsers = clerkUsers.map((user: User) => ({
-      clerkId: user.id,
-      username: user.username || '',
-      displayName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || '',
-      imageUrl: user.imageUrl,
+    // Create cache entries for missing users
+    const newCacheEntries = clerkUsers.map((u: User) => ({
+      clerkId: u.id,
+      username: u.username || '',
+      displayName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.username || '',
+      imageUrl: u.imageUrl || null,
       lastSynced: new Date()
     }));
 
-    userCaches = [...userCaches, ...freshUsers];
+    // Update cache with new entries
+    if (newCacheEntries.length > 0) {
+      await UserCacheModel.bulkWrite(newCacheEntries.map((user) => ({
+        updateOne: {
+          filter: { clerkId: user.clerkId },
+          update: { $set: user },
+          upsert: true
+        }
+      })));
+    }
+
+    // Add new cache entries to userCaches
+    userCaches = [...userCaches, ...newCacheEntries];
   }
 
   // Create a map for quick lookup
@@ -296,4 +285,67 @@ export async function getSharedLists(userId: string) {
   }
 
   return getEnhancedLists(query);
+}
+
+export async function getListCollaborators(listId: string): Promise<any[]> {
+  const ListModel = await getListModel();
+  const UserCacheModel = await getUserCacheModel();
+
+  const list = await ListModel.findById(listId).lean();
+  if (!list) {
+    return [];
+  }
+
+  const userIds = (list.collaborators || [])
+    .map(c => c.clerkId)
+    .filter((id): id is string => id !== undefined);
+  let userCaches = await UserCacheModel.find({
+    clerkId: { $in: userIds }
+  }).lean();
+
+  // Find users that need to be synced
+  const needSync = userIds.filter(
+    id => !userCaches.some(cache => cache.clerkId === id)
+  );
+
+  if (needSync.length > 0) {
+    const clerkUsers = await ClerkService.getUserList(needSync);
+
+    // Create a map of Clerk users for quick lookup
+    const clerkUserMap = new Map(
+      clerkUsers.map((u: User) => [u.id, u])
+    );
+
+    // Combine the data
+    const enhancedUsers = userCaches.map((user) => {
+      const clerkUser = clerkUserMap.get(user.clerkId) as { imageUrl?: string } | undefined;
+      return {
+        ...user,
+        imageUrl: clerkUser?.imageUrl ?? null,
+      };
+    });
+
+    // Update cache
+    if (enhancedUsers.length > 0) {
+      await UserCacheModel.bulkWrite(enhancedUsers.map((user) => ({
+        updateOne: {
+          filter: { clerkId: user.clerkId },
+          update: {
+            $set: {
+              clerkId: user.clerkId,
+              username: user.username || '',
+              displayName: user.displayName || '',
+              imageUrl: user.imageUrl,
+              lastSynced: new Date()
+            }
+          },
+          upsert: true
+        }
+      })));
+    }
+
+    userCaches = enhancedUsers;
+  }
+
+  return userCaches;
 } 

@@ -1,4 +1,5 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { clerkClient as createClerkClient } from "@clerk/nextjs/server";
 import { getListModel, type ListDocument } from "@/lib/db/models-v2/list";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { getUserModel } from "@/lib/db/models-v2/user";
@@ -18,6 +19,9 @@ interface PageProps {
     from?: string;
   };
 }
+
+// Get the client instance
+const clerkClient = createClerkClient();
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   try {

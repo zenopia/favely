@@ -11,6 +11,22 @@ import { useAuthService } from "@/lib/services/auth.service";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React from 'react';
 
+interface UserInviteValue {
+  type: 'user';
+  userId: string;
+  username: string;
+  displayName: string;
+  imageUrl: string | null;
+}
+
+interface EmailInviteValue {
+  type: 'email';
+  email: string;
+  note?: string;
+}
+
+type InviteValue = UserInviteValue | EmailInviteValue;
+
 interface Collaborator {
   userId: string;
   clerkId: string;
@@ -23,13 +39,11 @@ interface Collaborator {
   displayName?: string;
 }
 
-interface FollowingResult {
-  followingId: string;
-  user: {
-    username: string;
-    displayName: string;
-    imageUrl?: string;
-  };
+interface FollowingUser {
+  id: string;
+  username: string;
+  displayName: string;
+  imageUrl: string | null;
 }
 
 interface CollaboratorManagementProps {
@@ -144,7 +158,9 @@ export function CollaboratorManagement({
       const response = await fetch('/api/users/following');
       if (!response.ok) throw new Error();
       const data = await response.json();
-      const followingIds = data.following.map((result: FollowingResult) => result.followingId);
+      
+      // Extract IDs from the following array
+      const followingIds = data.following.map((user: FollowingUser) => user.id);
       
       // Cache the response
       sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -177,7 +193,7 @@ export function CollaboratorManagement({
     setTimeout(onClose, 300); // Wait for animation to complete
   };
 
-  const handleInvite = async (value: { type: 'user' | 'email', userId?: string, username?: string, email?: string }) => {
+  const handleInvite = async (value: InviteValue) => {
     const toastId = toast.loading(
       value.type === 'user' 
         ? 'Adding collaborator...' 
@@ -198,8 +214,8 @@ export function CollaboratorManagement({
 
       const requestBody = {
         type: value.type,
-        targetUserId: value.userId,  // This is already the Clerk ID
-        email: value.email,
+        targetUserId: value.type === 'user' ? value.userId : undefined,
+        email: value.type === 'email' ? value.email : undefined,
         role: 'viewer',
         status: value.type === 'user' ? 'accepted' : 'pending'
       };
@@ -221,16 +237,15 @@ export function CollaboratorManagement({
 
       // For user invites, we want to show them immediately as an accepted collaborator
       if (value.type === 'user') {
-        // The user data is already in the value object from the combobox
         const newCollaborator = {
           userId: value.userId,
           clerkId: value.userId,
           username: value.username,
+          displayName: value.displayName,
+          imageUrl: value.imageUrl,
           role: 'viewer',
           status: 'accepted',
-          _isEmailInvite: false,
-          imageUrl: (value as any).imageUrl,
-          displayName: (value as any).displayName
+          _isEmailInvite: false
         } as Collaborator;
         
         setCollaborators(prevCollaborators => [...prevCollaborators, newCollaborator]);
@@ -249,21 +264,14 @@ export function CollaboratorManagement({
         value.type === 'user' 
           ? 'Collaborator added successfully' 
           : 'Invitation sent successfully',
-        {
-          id: toastId
-        }
+        { id: toastId }
       );
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message, { id: toastId });
-      } else {
-        toast.error(
-          value.type === 'user'
-            ? "Failed to add collaborator"
-            : "Failed to send invitation",
-          { id: toastId }
-        );
-      }
+      console.error('Error adding collaborator:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to add collaborator',
+        { id: toastId }
+      );
     } finally {
       setIsLoading(false);
     }

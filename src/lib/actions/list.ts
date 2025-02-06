@@ -8,9 +8,10 @@ import { notFound } from "next/navigation";
 import { EnhancedList } from "@/types/list";
 import { FilterQuery, QueryOptions } from "mongoose";
 import { MongoListDocument } from "@/types/mongo";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export async function getList(listId: string) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
 
   await connectToMongoDB();
   const ListModel = await getListModel();
@@ -56,7 +57,7 @@ export async function updateList(
     items?: any[];
   }
 ) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     throw new Error("Unauthorized");
   }
@@ -96,7 +97,7 @@ export async function updateList(
 }
 
 export async function deleteList(listId: string) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     throw new Error("Unauthorized");
   }

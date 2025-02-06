@@ -6,6 +6,7 @@ import type { Follow } from "@/types/follow";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { AuthService } from "@/lib/services/auth.service";
 import { connectToMongoDB } from "@/lib/db/client";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   params: { username: string };
@@ -29,7 +30,7 @@ export default async function UserFollowingPage({ params, searchParams }: PagePr
     }
 
     // Get current user if logged in (for follow status)
-    const currentUser = await AuthService.getCurrentUser();
+    const currentUser = await AuthServerService.getCurrentUser();
     
     // Get following IDs for the profile user
     const followModel = await getFollowModel();

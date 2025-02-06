@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { AuthService } from "@/lib/services/auth.service";
 import { getSharedLists } from "@/lib/actions/lists";
 import { MyListsLayout } from "@/components/lists/my-lists-layout";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export default async function SharedListsPage() {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect('/sign-in');
   }

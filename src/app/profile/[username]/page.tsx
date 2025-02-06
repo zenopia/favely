@@ -11,6 +11,7 @@ import { getUserProfileModel } from "@/lib/db/models-v2/user-profile";
 import { getEnhancedLists } from "@/lib/actions/lists";
 import type { ListCategory } from "@/types/list";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   params: {
@@ -26,7 +27,7 @@ interface PageProps {
 export default async function UserPage({ params, searchParams }: PageProps) {
   try {
     // Get current user's auth state
-    const currentUser = await AuthService.getCurrentUser();
+    const currentUser = await AuthServerService.getCurrentUser();
     const currentUserId = currentUser?.id;
 
     // Remove @ if present and decode the username
@@ -49,7 +50,7 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     }
 
     // Get user from AuthService using the clerkId from MongoDB
-    const profileUser = await AuthService.getUserById(mongoUser.clerkId);
+    const profileUser = await AuthServerService.getUserById(mongoUser.clerkId);
     if (!profileUser) {
       console.error(`User not found: ${username}`);
       notFound();

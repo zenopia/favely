@@ -4,10 +4,11 @@ import { getUserModel } from "@/lib/db/models-v2/user";
 import { getUserProfileModel } from "@/lib/db/models-v2/user-profile";
 import { getListModel } from "@/lib/db/models-v2/list";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: "Unauthorized" },

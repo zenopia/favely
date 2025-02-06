@@ -3,6 +3,7 @@ import { AuthService } from "@/lib/services/auth.service";
 import { getPinnedLists } from "@/lib/actions/lists";
 import { ListCategory } from "@/types/list";
 import { ListsPageClient } from "../lists-page-client";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   searchParams: {
@@ -13,7 +14,7 @@ interface PageProps {
 }
 
 export default async function PinnedListsPage({ searchParams }: PageProps) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect('/sign-in');
   }

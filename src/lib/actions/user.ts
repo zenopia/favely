@@ -5,6 +5,7 @@ import { connectToDatabase } from "@/lib/db/mongodb";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
 import { MongoUserDocument } from "@/types/mongo";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export async function getUser(clerkId: string): Promise<MongoUserDocument | null> {
   await connectToDatabase();
@@ -25,7 +26,7 @@ export async function getFollowingCount(clerkId: string): Promise<number> {
 }
 
 export async function getFollowStatus(targetUserId: string): Promise<boolean> {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) return false;
 
   await connectToDatabase();
@@ -51,7 +52,7 @@ export async function deleteUser(clerkId: string): Promise<void> {
 }
 
 export async function ensureUserExists() {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     throw new Error("Not authenticated");
   }

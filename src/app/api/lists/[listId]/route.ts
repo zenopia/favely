@@ -5,6 +5,7 @@ import { getListModel, ListDocument, ListCollaborator } from "@/lib/db/models-v2
 import { getEnhancedLists } from "@/lib/actions/lists";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { Types } from "mongoose";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface ListItem {
   title: string;
@@ -47,7 +48,7 @@ export async function GET(
   request: Request,
   { params }: { params: { listId: string } }
 ) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
 
   try {
     const { listId } = params;
@@ -115,7 +116,7 @@ export async function PUT(
   { params }: { params: { listId: string } }
 ) {
   try {
-    const currentUser = await AuthService.getCurrentUser();
+    const currentUser = await AuthServerService.getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -222,7 +223,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: { listId: string } }
 ) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
@@ -257,7 +258,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: { listId: string } }
 ) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     return new NextResponse("Unauthorized", { status: 401 });
   }

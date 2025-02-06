@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ interface UserSearchResponse {
     id: string;
     username: string;
     displayName: string;
-    imageUrl?: string;
+    imageUrl: string | null;
   }>;
 }
 
@@ -18,58 +18,52 @@ interface ErrorResponse {
   error: string;
 }
 
-export async function GET(
-  req: NextRequest
-): Promise<NextResponse<UserSearchResponse | ErrorResponse>> {
+export async function GET(req: NextRequest): Promise<NextResponse<UserSearchResponse | ErrorResponse>> {
   try {
-    const user = await AuthService.getCurrentUser();
-    if (!user) {
-      return NextResponse.json<ErrorResponse>(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+    const { searchParams } = new URL(req.url);
+    const query = searchParams.get("q");
+    const currentUser = await AuthServerService.getCurrentUser();
 
-    const searchQuery = req.nextUrl.searchParams.get('q');
-    if (!searchQuery) {
-      return NextResponse.json<ErrorResponse>(
-        { error: "Search query is required" },
-        { status: 400 }
-      );
+    if (!query) {
+      return NextResponse.json({ users: [] });
     }
 
     await connectToMongoDB();
     const UserModel = await getUserModel();
 
-    // Search for users by username or displayName, excluding the current user
+    // Search for users
     const users = await UserModel.find({
       $and: [
-        { clerkId: { $ne: user.id } }, // Exclude current user
         {
           $or: [
-            { username: { $regex: searchQuery, $options: 'i' } },
-            { displayName: { $regex: searchQuery, $options: 'i' } }
+            { username: { $regex: query, $options: "i" } },
+            { displayName: { $regex: query, $options: "i" } }
           ]
-        }
+        },
+        // Exclude current user from results
+        currentUser ? { clerkId: { $ne: currentUser.id } } : {}
       ]
     })
-    .select('clerkId username displayName imageUrl')
-    .limit(10)
-    .lean();
+      .select("clerkId username displayName imageUrl")
+      .limit(10)
+      .lean();
 
-    return NextResponse.json<UserSearchResponse>({
-      users: users.map(user => ({
-        id: user.clerkId,
-        username: user.username,
-        displayName: user.displayName || user.username,
-        imageUrl: user.imageUrl
-      }))
-    });
+    console.log('Search query:', query);
+    console.log('Found users:', users);
+
+    // Transform users for response
+    const transformedUsers = users.map(user => ({
+      id: user.clerkId,
+      username: user.username || '',
+      displayName: user.displayName || user.username || '',
+      imageUrl: user.imageUrl || null
+    }));
+
+    console.log('Transformed users:', transformedUsers);
+
+    return NextResponse.json<UserSearchResponse>({ users: transformedUsers });
   } catch (error) {
     console.error("Error searching users:", error);
-    return NextResponse.json<ErrorResponse>(
-      { error: "Failed to search users" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to search users" }, { status: 500 });
   }
 } 

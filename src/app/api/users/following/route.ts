@@ -2,26 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
-import { clerkClient } from "@clerk/clerk-sdk-node";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
+import { withAuth, getUserId } from "@/lib/auth/api-utils";
+import { ClerkService } from "@/lib/services/authProvider.service";
 
 export const dynamic = 'force-dynamic';
 
 interface FollowingResponse {
   following: Array<{
     id: string;
-    followerId: string;
-    followingId: string;
-    createdAt: Date;
-    following: {
-      id: string;
-      username: string;
-      displayName: string;
-      bio: string;
-      imageUrl: string | null;
-      followersCount: number;
-      followingCount: number;
-    } | null;
+    username: string;
+    displayName: string;
+    imageUrl: string | null;
   }>;
   total: number;
   page: number;
@@ -37,7 +30,7 @@ export async function GET(
   req: NextRequest
 ): Promise<NextResponse<FollowingResponse | ErrorResponse>> {
   try {
-    const user = await AuthService.getCurrentUser();
+    const user = await AuthServerService.getCurrentUser();
     if (!user) {
       return NextResponse.json<ErrorResponse>(
         { error: "Unauthorized" },
@@ -65,51 +58,23 @@ export async function GET(
     ]);
 
     // Get user details for each followed user
-    const followingIds = following.map((f) => f.followingId);
-    const [followingDetails, clerkUsers] = await Promise.all([
-      UserModel.find({
-        clerkId: { $in: followingIds }
-      })
-        .select("username displayName bio followersCount followingCount")
-        .lean(),
-      clerkClient.users.getUserList({
-        userId: followingIds,
-      })
-    ]);
+    const followingIds = following.map((f: { followingId: string }) => f.followingId);
+    const followingDetails = await UserModel.find({
+      clerkId: { $in: followingIds }
+    })
+      .select("clerkId username displayName imageUrl")
+      .lean();
 
-    // Create maps for quick lookup
-    const followingMap = new Map(
-      followingDetails.map((f) => [f.clerkId, f])
-    );
-    const clerkUserMap = new Map(
-      clerkUsers.map((u) => [u.id, u])
-    );
-
-    // Combine follow data with user details
-    const enhancedFollowing = following.map((follow) => {
-      const followedUser = followingMap.get(follow.followingId);
-      const clerkUser = clerkUserMap.get(follow.followingId);
-      return {
-        id: follow._id.toString(),
-        followerId: follow.followerId,
-        followingId: follow.followingId,
-        createdAt: follow.createdAt,
-        following: followedUser
-          ? {
-              id: followedUser._id.toString(),
-              username: followedUser.username,
-              displayName: followedUser.displayName,
-              bio: followedUser.bio || "",
-              imageUrl: clerkUser?.imageUrl || null,
-              followersCount: followedUser.followersCount || 0,
-              followingCount: followedUser.followingCount || 0
-            }
-          : null
-      };
-    });
+    // Transform the data
+    const transformedFollowing = followingDetails.map(user => ({
+      id: user.clerkId,
+      username: user.username || '',
+      displayName: user.displayName || user.username || '',
+      imageUrl: user.imageUrl || null
+    }));
 
     return NextResponse.json<FollowingResponse>({
-      following: enhancedFollowing,
+      following: transformedFollowing,
       total,
       page,
       limit,

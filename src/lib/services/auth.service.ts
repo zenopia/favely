@@ -1,47 +1,8 @@
-import { auth as getAuth } from "@clerk/nextjs/server";
+'use client';
+
 import { useAuth as useClerkAuth, useClerk } from "@clerk/nextjs";
 import { AuthUser } from "@/types/auth";
-import connectToMongoDB from "@/lib/db/mongodb";
-import { getUserModel } from "@/lib/db/models-v2/user";
-import type { ActiveSessionResource } from '@clerk/types';
 import React from 'react';
-import { headers } from 'next/headers';
-
-// Define projection for user queries to only select needed fields
-const USER_PROJECTION = {
-  clerkId: 1,
-  email: 1,
-  username: 1,
-  displayName: 1,
-  imageUrl: 1,
-  _id: 0
-};
-
-// Retry configuration
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY = 100; // ms
-
-const withRetry = async <T>(operation: () => Promise<T>, retries = MAX_RETRIES): Promise<T> => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (i === retries - 1) throw error;
-      await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * INITIAL_RETRY_DELAY));
-    }
-  }
-  throw new Error('Max retries reached');
-};
-
-const transformUser = (user: any): AuthUser => ({
-  id: user.clerkId,
-  email: user.email || null,
-  username: user.username,
-  firstName: null,
-  lastName: null,
-  fullName: user.displayName,
-  imageUrl: user.imageUrl,
-});
 
 // Add cache configuration
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
@@ -50,201 +11,108 @@ type CacheEntry = {
   timestamp: number;
 };
 
-// Global cache for both server and client
+// Global cache for client
 const userCache = new Map<string, CacheEntry>();
 
 // Global promise cache to prevent duplicate in-flight requests
 const requestCache = new Map<string, Promise<AuthUser | null>>();
 
-export class AuthService {
-  static async getCurrentUser(userId?: string | null): Promise<AuthUser | null> {
-    // If userId is not provided, try to get it from auth context
-    if (!userId) {
+async function getCurrentUser(userId?: string | null): Promise<AuthUser | null> {
+  if (!userId) return null;
+
+  // Check memory cache first
+  const cached = userCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  // Check if there's an in-flight request
+  const pendingRequest = requestCache.get(userId);
+  if (pendingRequest) {
+    return pendingRequest;
+  }
+
+  // Create new request promise
+  const request = (async () => {
+    try {
+      const response = await fetch('/api/users/me', {
+        cache: 'no-store'
+      });
+      const userData = response.ok ? await response.json() : null;
+
+      // Update cache
+      userCache.set(userId, { data: userData, timestamp: Date.now() });
+      return userData;
+    } finally {
+      // Clean up request cache
+      requestCache.delete(userId);
+    }
+  })();
+
+  // Store the promise in the request cache
+  requestCache.set(userId, request);
+  return request;
+}
+
+// Custom hook for auth state
+export function useAuth() {
+  const clerk = useClerk();
+  const { isSignedIn, isLoaded: clerkLoaded } = useClerkAuth();
+  const [user, setUser] = React.useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    const fetchUser = async () => {
       try {
-        // Only try to get auth on server side
-        if (typeof window === 'undefined') {
-          const { userId: authUserId } = getAuth();
-          userId = authUserId;
-        }
-      } catch (error) {
-        console.debug('Failed to get auth:', error);
-        return null;
-      }
-    }
-
-    if (!userId) return null;
-
-    // Check memory cache first
-    const cached = userCache.get(userId);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.data;
-    }
-
-    // Check if there's an in-flight request
-    const pendingRequest = requestCache.get(userId);
-    if (pendingRequest) {
-      return pendingRequest;
-    }
-
-    // Create new request promise
-    const request = (async () => {
-      try {
-        let userData: AuthUser | null = null;
-
-        // If we're in a browser environment, fetch through the API
-        if (typeof window !== 'undefined') {
-          const response = await fetch('/api/users/me', {
-            cache: 'no-store'
-          });
-          if (response.ok) {
-            userData = await response.json();
-          }
+        if (isSignedIn && clerk.session?.id) {
+          const userData = await getCurrentUser(clerk.session.user?.id);
+          if (mounted) setUser(userData);
         } else {
-          // Server-side: direct DB access with retry
-          await connectToMongoDB();
-          const UserModel = await getUserModel();
-          const user = await UserModel.findOne(
-            { clerkId: userId },
-            USER_PROJECTION
-          ).lean();
-          
-          userData = user ? transformUser(user) : null;
-        }
-
-        // Update cache
-        userCache.set(userId, { data: userData, timestamp: Date.now() });
-        return userData;
-      } finally {
-        // Clean up request cache
-        requestCache.delete(userId);
-      }
-    })();
-
-    // Store the promise in the request cache
-    requestCache.set(userId, request);
-    return request;
-  }
-
-  static async getUserByUsername(username: string): Promise<AuthUser | null> {
-    return withRetry(async () => {
-      await connectToMongoDB();
-      const UserModel = await getUserModel();
-      const user = await UserModel.findOne(
-        { username },
-        USER_PROJECTION
-      ).lean();
-      
-      return user ? transformUser(user) : null;
-    });
-  }
-
-  static async getUserByClerkId(clerkId: string): Promise<AuthUser | null> {
-    return withRetry(async () => {
-      await connectToMongoDB();
-      const UserModel = await getUserModel();
-      const user = await UserModel.findOne(
-        { clerkId },
-        USER_PROJECTION
-      ).lean();
-      
-      return user ? transformUser(user) : null;
-    });
-  }
-
-  static async getUserById(userId: string): Promise<AuthUser | null> {
-    return withRetry(async () => {
-      await connectToMongoDB();
-      const UserModel = await getUserModel();
-      const user = await UserModel.findOne(
-        { clerkId: userId },
-        USER_PROJECTION
-      ).lean();
-      
-      return user ? transformUser(user) : null;
-    });
-  }
-
-  static async getUserByEmail(email: string): Promise<AuthUser | null> {
-    return withRetry(async () => {
-      await connectToMongoDB();
-      const UserModel = await getUserModel();
-      const user = await UserModel.findOne(
-        { email },
-        USER_PROJECTION
-      ).lean();
-      
-      return user ? transformUser(user) : null;
-    });
-  }
-
-  static async getUsersByIds(userIds: string[]): Promise<AuthUser[]> {
-    return withRetry(async () => {
-      await connectToMongoDB();
-      const UserModel = await getUserModel();
-      const users = await UserModel.find(
-        { clerkId: { $in: userIds } },
-        USER_PROJECTION
-      ).lean();
-      
-      return users.map(transformUser);
-    });
-  }
-
-  // Hook for client-side auth state
-  static useAuth() {
-    const clerk = useClerk();
-    const { isSignedIn, isLoaded: clerkLoaded } = useClerkAuth();
-    const [user, setUser] = React.useState<AuthUser | null>(null);
-    const [isLoading, setIsLoading] = React.useState(true);
-
-    React.useEffect(() => {
-      if (typeof window === 'undefined') return;
-      let mounted = true;
-
-      const fetchUser = async () => {
-        try {
-          if (isSignedIn && clerk.session?.id) {
-            const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
-            if (mounted) setUser(userData);
-          } else {
-            if (mounted) setUser(null);
-          }
-        } catch (error) {
-          console.error('Error fetching user:', error);
           if (mounted) setUser(null);
-        } finally {
-          if (mounted) setIsLoading(false);
         }
-      };
-
-      if (clerkLoaded) {
-        fetchUser();
-      }
-
-      return () => {
-        mounted = false;
-      };
-    }, [isSignedIn, clerkLoaded, clerk.session?.id]);
-
-    const signOut = React.useCallback(async () => {
-      try {
-        await clerk.signOut();
-        setUser(null);
-        // Clear cache on sign out
-        userCache.clear();
-        requestCache.clear();
       } catch (error) {
-        console.error('Error signing out:', error);
+        console.error('Error fetching user:', error);
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) setIsLoading(false);
       }
-    }, [clerk]);
-
-    return {
-      isSignedIn,
-      isLoaded: clerkLoaded && !isLoading,
-      user,
-      signOut
     };
-  }
+
+    if (clerkLoaded) {
+      fetchUser();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [isSignedIn, clerkLoaded, clerk.session?.id, clerk.session?.user?.id]);
+
+  const signOut = React.useCallback(async () => {
+    try {
+      await clerk.signOut();
+      setUser(null);
+      // Clear cache on sign out
+      userCache.clear();
+      requestCache.clear();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  }, [clerk]);
+
+  return {
+    isSignedIn,
+    isLoaded: clerkLoaded && !isLoading,
+    user,
+    signOut
+  };
+}
+
+// Export the class for backward compatibility
+export class AuthService {
+  static getCurrentUser = getCurrentUser;
+  static useAuth = useAuth;
 }
 
 // Client-side hooks
@@ -318,7 +186,7 @@ export function useAuthService() {
       }
 
       try {
-        const userData = await AuthService.getCurrentUser(clerk.session.user?.id);
+        const userData = await getCurrentUser(clerk.session.user?.id);
         if (isMounted) {
           setUser(userData);
           setIsInitialLoad(false);

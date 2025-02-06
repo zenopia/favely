@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { AuthService } from "@/lib/services/auth.service";
 import { ListFormContent } from "@/components/lists/list-form-content";
 import { ProtectedPageWrapper } from "@/components/auth/protected-page-wrapper";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export default async function CreateListPage() {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect('/sign-in');
   }

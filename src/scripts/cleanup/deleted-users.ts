@@ -1,9 +1,9 @@
-import { clerkClient } from "@clerk/clerk-sdk-node";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { getUserProfileModel } from "@/lib/db/models-v2/user-profile";
 import { getListModel } from "@/lib/db/models-v2/list";
 import { getFollowModel } from "@/lib/db/models-v2/follow";
+import { ClerkService } from "@/lib/services/authProvider.service";
 
 async function cleanupDeletedUsers() {
   try {
@@ -36,7 +36,7 @@ async function cleanupDeletedUsers() {
       try {
         // Try to get user from Clerk
         try {
-          await clerkClient.users.getUser(dbUser.clerkId);
+          await ClerkService.getUser(dbUser.clerkId);
           // If successful, user still exists in Clerk, skip to next
           continue;
         } catch (error: any) {

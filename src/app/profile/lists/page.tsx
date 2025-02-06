@@ -4,6 +4,7 @@ import { getEnhancedLists } from "@/lib/actions/lists";
 import { ListsPageClient } from "./lists-page-client";
 import { ListCategory } from "@/types/list";
 import { fetchMoreLists } from "@/lib/actions/fetch-lists";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   searchParams: {
@@ -14,7 +15,7 @@ interface PageProps {
 }
 
 export default async function ProfileListsPage({ searchParams }: PageProps) {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect('/sign-in');
   }

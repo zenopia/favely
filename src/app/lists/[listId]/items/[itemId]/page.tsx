@@ -8,6 +8,7 @@ import { connectToMongoDB } from "@/lib/db/client";
 import { notFound } from "next/navigation";
 import type { EnhancedList, ListCategory } from "@/types/list";
 import { ItemView } from "@/components/items/item-view";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   params: {
@@ -22,14 +23,14 @@ interface PageProps {
 
 export default async function ItemPage({ params, _searchParams }: PageProps) {
   try {
-    const currentUser = await AuthService.getCurrentUser();
+    const currentUser = await AuthServerService.getCurrentUser();
     const userId = currentUser?.id;
 
     // Remove @ if present and decode the username
     const username = decodeURIComponent(params.username).replace(/^@/, '');
 
     // Get user from AuthService
-    const profileUser = await AuthService.getUserByUsername(username);
+    const profileUser = await AuthServerService.getUserByUsername(username);
     if (!profileUser) {
       console.error(`User not found: ${username}`);
       notFound();

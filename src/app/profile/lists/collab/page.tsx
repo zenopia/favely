@@ -3,6 +3,7 @@ import { getEnhancedLists } from "@/lib/actions/lists";
 import { MyListsLayout } from "@/components/lists/my-lists-layout";
 import { ListCategory } from "@/types/list";
 import { AuthService } from "@/lib/services/auth.service";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 interface PageProps {
   searchParams: {
@@ -14,7 +15,7 @@ interface PageProps {
 
 export default async function CollaborativeListsPage({ searchParams }: PageProps) {
   console.log('Accessing Collaborative Lists Page');
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
 
   if (!user) {
     console.log('No user found, redirecting to sign-in');

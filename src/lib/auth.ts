@@ -3,9 +3,10 @@ import { AuthService } from "@/lib/services/auth.service";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getUserModel } from "@/lib/db/models-v2/user";
 import { getUserProfileModel } from "@/lib/db/models-v2/user-profile";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export async function checkAuth() {
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect("/sign-in");
   }
@@ -18,7 +19,7 @@ export async function checkProfile(returnUrl?: string) {
     return;
   }
 
-  const user = await AuthService.getCurrentUser();
+  const user = await AuthServerService.getCurrentUser();
   if (!user) {
     redirect("/sign-in");
   }
