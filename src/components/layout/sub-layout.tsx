@@ -5,6 +5,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Sidebar } from "@/components/layout/nav/sidebar";
 
 function FeedbackButton() {
   const pathname = usePathname();
@@ -116,9 +117,12 @@ export function SubLayout({ children, title = "Page", action }: SubLayoutProps) 
           
         </div>
       </div>
-      <main className="flex-1">
-        {children}
-      </main>
+      <div className="flex flex-1">
+        <Sidebar className="hidden md:flex" />
+        <main className="flex-1">
+          {children}
+        </main>
+      </div>
     </div>
   );
 } 
