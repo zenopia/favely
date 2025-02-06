@@ -101,10 +101,10 @@ export function ListView({
                 return (
                   <li 
                     key={itemKey} 
-                    className="flex items-stretch rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer group"
+                    className="group relative flex items-stretch rounded-lg border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 cursor-pointer"
                   >
-                    <div className="flex items-center justify-center min-w-[3rem] bg-muted rounded-l-lg group-hover:bg-muted/70 transition-colors">
-                      <span className="text-base font-medium text-muted-foreground">
+                    <div className="flex items-center justify-center min-w-[3rem] bg-muted rounded-l-lg group-hover:bg-accent/50 transition-all duration-200">
+                      <span className="text-base font-medium text-muted-foreground group-hover:text-accent-foreground">
                         {list.listType === 'ordered' ? (
                           index + 1
                         ) : (
