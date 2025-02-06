@@ -120,4 +120,67 @@
 .ProseMirror ul li::marker,
 .ProseMirror ol li::marker {
   color: #64748b;
+}
+
+/* List item styles */
+.ProseMirror .list-item {
+  position: relative;
+  margin: 0.2rem 0;
+  padding: 0.5rem;
+  padding-left: 2.5rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  background-color: transparent;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+/* Active state */
+.ProseMirror .list-item.is-active {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgb(59, 130, 246);
+}
+
+/* Selected state */
+.ProseMirror .list-item.is-selected {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: rgb(59, 130, 246);
+}
+
+/* Drag handle */
+.ProseMirror .list-item .drag-handle {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #64748b;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  cursor: move;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  padding: 0.5rem 0.25rem;
+  z-index: 10;
+}
+
+/* Show drag handle for active and selected items */
+.ProseMirror .list-item.is-active .drag-handle,
+.ProseMirror .list-item.is-selected .drag-handle,
+.ProseMirror .list-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.ProseMirror .list-item.is-active .drag-handle,
+.ProseMirror .list-item.is-selected .drag-handle {
+  color: rgb(59, 130, 246);
+}
+
+/* Dragging styles */
+.ProseMirror .list-item.is-dragging {
+  opacity: 0.5;
+  background-color: rgba(59, 130, 246, 0.1);
+  cursor: move;
 } 

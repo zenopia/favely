@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { ListOrdered, List } from 'lucide-react'
 import { useState } from 'react'
 import { TextSelection } from 'prosemirror-state'
+import { ListItemExtension } from './list-item-extension'
 import './tiptap-editor.css'
 
 interface TiptapEditorProps {
@@ -29,6 +30,7 @@ export function TiptapEditor({
   placeholder = 'Start typing...',
 }: TiptapEditorProps) {
   const [currentListType, setCurrentListType] = useState<ListType>(defaultListType)
+  const [isDragging, setIsDragging] = useState(false)
 
   const editor = useEditor({
     extensions: [
@@ -46,7 +48,9 @@ export function TiptapEditor({
           keepMarks: true,
           keepAttributes: false,
         },
+        listItem: false, // Disable default list item to use our custom one
       }),
+      ListItemExtension,
     ],
     content,
     editable,
@@ -80,6 +84,24 @@ export function TiptapEditor({
       }
       setCurrentListType(defaultListType)
     },
+    onSelectionUpdate: ({ editor }) => {
+      // Only update active state if we're not dragging
+      if (!isDragging) {
+        let foundListItem = false
+        editor.state.doc.nodesBetween(editor.state.selection.from, editor.state.selection.to, (node, pos) => {
+          if (node.type.name === 'listItem' && !foundListItem) {
+            editor.commands.setListItemActive(pos)
+            foundListItem = true
+            return false
+          }
+        })
+
+        // If no list item was found in the selection, clear active state
+        if (!foundListItem) {
+          editor.commands.setListItemActive(null)
+        }
+      }
+    },
     onUpdate: ({ editor }) => {
       // Check if editor is completely empty (no list structure)
       if (editor.isEmpty) {
@@ -100,18 +122,27 @@ export function TiptapEditor({
         class: 'prose dark:prose-invert focus:outline-none max-w-none',
         'data-placeholder': placeholder,
       },
+      handleDOMEvents: {
+        dragstart: (view, event) => {
+          if (event.target instanceof HTMLElement && event.target.closest('[data-drag-handle]')) {
+            setIsDragging(true)
+            return true
+          }
+          return false
+        },
+        drop: (view, event) => {
+          setIsDragging(false)
+          return false
+        },
+        dragend: (view, event) => {
+          setIsDragging(false)
+          return false
+        },
+      },
       handleKeyDown: (view, event) => {
         const { state } = view
         const { selection } = state
         const { empty, $head } = selection
-
-        // Handle Enter key
-        if (event.key === 'Enter' && !event.shiftKey) {
-          // If we're in an empty list item
-          if (empty && $head.parent.textContent === '') {
-            return true // Prevent default behavior (lifting out of list)
-          }
-        }
 
         // Handle Backspace key
         if (event.key === 'Backspace' && empty) {
@@ -143,11 +174,6 @@ export function TiptapEditor({
               return true
             }
           }
-        }
-
-        // Prevent exiting list format with Enter+Shift
-        if (event.key === 'Enter' && event.shiftKey) {
-          return true
         }
 
         return false
