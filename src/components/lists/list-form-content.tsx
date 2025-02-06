@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import type { ListType } from "@/components/editor/tiptap-editor";
 import { useAuth, useUser } from "@clerk/nextjs";
+import { cn } from "@/lib/utils";
 
 import {
   Form,
@@ -135,10 +136,14 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
 
     try {
       const payload = {
-        ...data,
+        title: data.title,
+        category: data.category,
+        description: data.description,
+        privacy: data.privacy,
+        listType: data.listType,
         items: listItems.map(item => ({
           title: item.textContent || '',
-          completed: false, // Always include completed status, defaulting to false
+          completed: false,
         }))
       };
 
@@ -222,138 +227,161 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="container max-w-4xl mx-auto px-4 py-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">{mode === 'create' ? 'Create List' : 'Edit List'}</h1>
-          {mode === 'edit' && (
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                'Delete List'
-              )}
-            </Button>
-          )}
-        </div>
-
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Input 
-                  placeholder="List title" 
-                  className="text-xl font-medium h-12"
-                  {...field} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="flex items-center gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-[calc(100vh-64px)]">
+        <div className="flex-1 container max-w-4xl mx-auto px-4 py-4 space-y-6">
           <FormField
             control={form.control}
-            name="category"
-            render={({ field }) => (
-              <FormItem className="flex-1">
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {FORM_CATEGORIES.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="privacy"
+            name="title"
             render={({ field }) => (
               <FormItem>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Privacy" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="public">Public</SelectItem>
-                    <SelectItem value="private">Private</SelectItem>
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <Input 
+                    placeholder="List title" 
+                    className="text-2xl font-bold h-14 bg-muted/50 focus-visible:bg-muted/80"
+                    {...field} 
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
 
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Textarea 
-                  placeholder="Description (optional)" 
-                  {...field} 
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+          <div className="flex items-center gap-4">
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {FORM_CATEGORIES.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          <div className="flex items-center gap-2">
+                            <div className={cn(
+                              "h-3.5 w-3.5 rounded-full shrink-0",
+                              {
+                                'bg-[var(--category-movies)]': category === 'movies',
+                                'bg-[var(--category-tv)]': category === 'tv-shows',
+                                'bg-[var(--category-books)]': category === 'books',
+                                'bg-[var(--category-restaurants)]': category === 'restaurants',
+                                'bg-[var(--category-recipes)]': category === 'recipes',
+                                'bg-[var(--category-activities)]': category === 'things-to-do',
+                                'bg-[var(--category-other)]': category === 'other'
+                              }
+                            )} />
+                            <span>
+                              {category === 'tv-shows' ? 'TV Shows' : 
+                               category === 'things-to-do' ? 'Things to do' :
+                               category.charAt(0).toUpperCase() + category.slice(1)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium">List Items</h3>
+            <FormField
+              control={form.control}
+              name="privacy"
+              render={({ field }) => (
+                <FormItem>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Privacy" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="public">Public</SelectItem>
+                      <SelectItem value="private">Private</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Type or paste your items below.
-                Press Enter to add new items. You can reorder items by dragging them.
-              </p>
-              <TiptapEditor
-                content={editorContent}
-                onChange={setEditorContent}
-                onListTypeChange={handleListTypeChange}
-                defaultListType={defaultValues?.listType || 'ordered'}
-                placeholder=""
-                className="min-h-[200px]"
-              />
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <Textarea 
+                    placeholder="Description (optional)" 
+                    className="resize-none"
+                    {...field} 
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium">List Items</h3>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Type or paste your items below.
+                  Press Enter to add new items.
+                </p>
+                <TiptapEditor
+                  content={editorContent}
+                  onChange={setEditorContent}
+                  onListTypeChange={handleListTypeChange}
+                  defaultListType={defaultValues?.listType || 'ordered'}
+                  placeholder=""
+                  className="min-h-[200px]"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <Button type="submit" disabled={isSubmitting} className="w-full">
-          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === 'create' ? 'Create List' : 'Update List'}
-        </Button>
+        <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+          <div className="container max-w-4xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between gap-4">
+              {mode === 'edit' && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Delete List'
+                  )}
+                </Button>
+              )}
+              <Button type="submit" disabled={isSubmitting} className="ml-auto">
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {mode === 'create' ? 'Create List' : 'Update List'}
+              </Button>
+            </div>
+          </div>
+        </div>
       </form>
     </Form>
   );

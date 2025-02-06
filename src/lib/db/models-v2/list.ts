@@ -33,7 +33,7 @@ export interface ListDocument extends Document {
   description?: string;
   category: string;
   privacy: 'public' | 'private';
-  listType: 'ordered' | 'bullets';
+  listType: 'ordered' | 'bullet';
   owner: ListOwner;
   collaborators: ListCollaborator[];
   items: ListItem[];
@@ -52,7 +52,7 @@ const listSchema = new Schema<ListDocument>({
   description: { type: String },
   category: { type: String, enum: LIST_CATEGORIES, required: true },
   privacy: { type: String, enum: ['public', 'private'], default: 'public' },
-  listType: { type: String, enum: ['ordered', 'bullets'], default: 'ordered' },
+  listType: { type: String, enum: ['ordered', 'bullet'], default: 'ordered' },
   owner: {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     clerkId: { type: String, required: true }

@@ -30,7 +30,7 @@ export const OWNER_FILTER_OPTIONS = [
 ] as const;
 
 export type ListPrivacy = 'public' | 'private';
-export type ListType = 'ordered' | 'bullets';
+export type ListType = 'ordered' | 'bullet';
 
 export interface ListItem {
   id: string;

@@ -40,6 +40,7 @@ export default async function EditListPage({ params, searchParams }: PageProps) 
       description: list.description,
       category: list.category,
       privacy: list.privacy,
+      listType: list.listType || 'ordered',
       items: list.items || [],
       owner: {
         username: list.owner.username

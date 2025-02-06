@@ -123,7 +123,7 @@ export async function PUT(
 
     const { listId } = params;
     const data = await request.json();
-    const { title, description, category, privacy, items } = data;
+    const { title, description, category, privacy, items, listType } = data;
 
     await connectToMongoDB();
     const ListModel = await getListModel();
@@ -175,6 +175,7 @@ export async function PUT(
         description,
         category,
         privacy,
+        listType,
         items: processedItems,
         editedAt: new Date()
       },

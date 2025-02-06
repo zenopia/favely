@@ -99,10 +99,17 @@ export function ListView({
               {list.items.map((item, index) => {
                 const itemKey = `item-${item.id}-${index}`;
                 return (
-                  <li key={itemKey} className="flex items-stretch rounded-lg border bg-card">
-                    <div className="flex items-center justify-center min-w-[3rem] bg-muted rounded-l-lg">
+                  <li 
+                    key={itemKey} 
+                    className="flex items-stretch rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-center min-w-[3rem] bg-muted rounded-l-lg group-hover:bg-muted/70 transition-colors">
                       <span className="text-base font-medium text-muted-foreground">
-                        {index + 1}
+                        {list.listType === 'ordered' ? (
+                          index + 1
+                        ) : (
+                          <span className="text-xl">•</span>
+                        )}
                       </span>
                     </div>
                     <div className="flex-1 p-4">
