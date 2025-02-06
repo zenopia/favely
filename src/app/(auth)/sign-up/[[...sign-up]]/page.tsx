@@ -8,8 +8,8 @@ export default function SignUpPage() {
   const returnUrl = searchParams?.get("returnUrl");
 
   return (
-    <div className="container flex items-center justify-center min-h-[calc(100vh-4rem)] py-8">
-      <SignUp redirectUrl={returnUrl || "/"} />
+    <div className="container flex items-center justify-center pt-12">
+      <SignUp fallbackRedirectUrl={returnUrl || "/"} />
     </div>
   );
 } 

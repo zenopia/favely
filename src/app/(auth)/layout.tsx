@@ -14,22 +14,22 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const isSignIn = pathname === "/sign-in";
   const currentUrl = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '');
-  const returnUrl = searchParams.get("returnUrl");
+  const fallbackRedirectUrl = searchParams.get("fallbackRedirectUrl");
 
   const handleBack = () => {
     // If we have history and we're not at the first page
     if (window.history.length > 2) {
       router.back();
-    } else if (returnUrl) {
-      // If we have a returnUrl but no history
+    } else if (fallbackRedirectUrl) {
+      // If we have a fallbackRedirectUrl but no history
       const isProtectedRoute = PROTECTED_ROUTES.some(route => 
-        decodeURIComponent(returnUrl).startsWith(route)
+        decodeURIComponent(fallbackRedirectUrl).startsWith(route)
       );
 
       if (isProtectedRoute) {
         router.push('/');
       } else {
-        router.push(decodeURIComponent(returnUrl));
+        router.push(decodeURIComponent(fallbackRedirectUrl));
       }
     } else {
       // Fallback to homepage
@@ -76,7 +76,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <p className="text-sm text-muted-foreground">
             {isSignIn ? "Don't have an account? " : "Already have an account? "}
             <Link
-              href={`${isSignIn ? "/sign-up" : "/sign-in"}${returnUrl ? `?returnUrl=${returnUrl}` : ''}`}
+              href={`${isSignIn ? "/sign-up" : "/sign-in"}${fallbackRedirectUrl ? `?fallbackRedirectUrl=${fallbackRedirectUrl}` : ''}`}
               className="font-medium text-primary hover:underline"
             >
               {isSignIn ? "Sign up" : "Sign in"}

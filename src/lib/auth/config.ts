@@ -26,7 +26,8 @@ export const authConfig: AuthProviderConfig = {
     "/about",
     "/about/(.*)",
     "/feedback",
-    "/feedback/(.*)"
+    "/feedback/(.*)",
+    "/api/feedback"
   ],
   protectedRoutes: [
     "/profile/lists",
@@ -45,7 +46,8 @@ export const authConfig: AuthProviderConfig = {
       "/api/lists/:listId", // Individual list endpoints
       "/api/users/:username", // Public user profile endpoints
       "/api/users/:username/follow/status", // Allow checking follow status
-      "/api/search"
+      "/api/search",
+      "/api/feedback" // Add feedback endpoint to public API paths
     ],
     protectedPaths: [
       "/api/lists/create",

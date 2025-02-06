@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { z } from "zod";
-import { withAuth, getUserId } from "@/lib/auth/api-utils";
+import { auth } from "@clerk/nextjs/server";
 
 const feedbackSchema = z.object({
   type: z.enum(["bug", "feature", "general", "other"]),
@@ -20,18 +20,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const POST = withAuth(async (req: NextRequest) => {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const validatedData = feedbackSchema.parse(body);
 
     // Get user ID if authenticated
-    let userId: string | undefined;
-    try {
-      userId = getUserId(req);
-    } catch {
-      // User is not authenticated - this is fine for feedback
-    }
+    const { userId } = auth();
 
     const { type, sourcePage, comment, username } = validatedData;
 
@@ -60,4 +55,4 @@ export const POST = withAuth(async (req: NextRequest) => {
       { status: 500 }
     );
   }
-}, { requireAuth: false }); 
+} 

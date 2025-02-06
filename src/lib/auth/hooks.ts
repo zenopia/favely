@@ -26,11 +26,15 @@ export function useAuth() {
   const clerk = useClerk();
 
   const signIn = async (returnUrl?: string) => {
-    await clerk.redirectToSignIn({ redirectUrl: returnUrl });
+    await clerk.redirectToSignIn({ 
+      signInFallbackRedirectUrl: returnUrl || '/'
+    });
   };
 
   const signUp = async (returnUrl?: string) => {
-    await clerk.redirectToSignUp({ redirectUrl: returnUrl });
+    await clerk.redirectToSignUp({ 
+      signUpFallbackRedirectUrl: returnUrl || '/'
+    });
   };
 
   const signOut = async () => {

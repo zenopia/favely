@@ -94,12 +94,11 @@ export function useAuthGuard({ protected: isProtected = false, redirectIfAuthed 
           if (isProtected && !token) {
             // Store current path for return after sign in
             if (typeof window !== 'undefined' && pathname !== '/' && !pathname.startsWith('/sign-in')) {
-              sessionStorage.setItem('returnUrl', pathname);
+              const returnUrl = encodeURIComponent(pathname);
+              router.push(`/sign-in?fallbackRedirectUrl=${returnUrl}`);
+            } else {
+              router.push('/sign-in');
             }
-            
-            // Redirect to sign in if trying to access protected route without valid token
-            const returnUrl = encodeURIComponent(pathname);
-            router.push(`/sign-in?returnUrl=${returnUrl}`);
             return;
           }
 

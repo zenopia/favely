@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { AuthService } from "@/lib/services/auth.service";
 import { getPinnedLists } from "@/lib/actions/lists";
 import { ListCategory } from "@/types/list";
 import { ListsPageClient } from "../lists-page-client";

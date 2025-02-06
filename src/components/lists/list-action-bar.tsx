@@ -42,7 +42,7 @@ export default function ListActionBar({
 
   const handlePin = async () => {
     if (!user) {
-      router.push(`/sign-in?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+      router.push(`/sign-in?fallbackRedirectUrl=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 
@@ -76,7 +76,7 @@ export default function ListActionBar({
 
   const handleCopy = async () => {
     if (!user) {
-      router.push(`/sign-in?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+      router.push(`/sign-in?fallbackRedirectUrl=${encodeURIComponent(window.location.pathname)}`);
       return;
     }
 

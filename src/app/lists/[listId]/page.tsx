@@ -124,7 +124,8 @@ export default async function ListPage({ params, searchParams }: PageProps) {
     // For private lists, check authentication and access
     if (list.privacy === 'private') {
       if (!userId) {
-        redirect('/sign-in');
+        const currentPath = `/lists/${params.listId}`;
+        redirect(`/sign-in?fallbackRedirectUrl=${encodeURIComponent(currentPath)}`);
       }
 
       if (!isOwner && !isCollaborator) {
