@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AuthFactory } from "./factory";
+import { auth } from "@clerk/nextjs/server";
 import { authConfig } from "./config";
+import { AuthFactory } from "./factory";
 
 type RouteHandler<TParams = Record<string, string>, TResponse = unknown> = (
   req: NextRequest,
@@ -67,20 +68,24 @@ export async function withAuth<TParams = Record<string, string>, TResponse = unk
  * Get the current user's ID from an authenticated request
  */
 export function getUserId(req: NextRequest): string {
-  const auth = (req as any).auth;
-  if (!auth?.userId) {
-    throw new Error('User ID not found in request');
+  const { userId } = auth();
+  
+  if (!userId) {
+    throw new Error('Unauthorized');
   }
-  return auth.userId;
+  
+  return userId;
 }
 
 /**
  * Get the current session ID from an authenticated request
  */
 export function getSessionId(req: NextRequest): string {
-  const auth = (req as any).auth;
-  if (!auth?.sessionId) {
-    throw new Error('Session ID not found in request');
+  const { sessionId } = auth();
+  
+  if (!sessionId) {
+    throw new Error('Session ID not found');
   }
-  return auth.sessionId;
+  
+  return sessionId;
 } 

@@ -1,17 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectToMongoDB } from "@/lib/db/client";
+import connectToMongoDB from "@/lib/db/mongodb";
 import { getListModel, ListDocument } from "@/lib/db/models-v2/list";
 import { getEnhancedLists } from "@/lib/actions/lists";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import { withAuth, getUserId } from "@/lib/auth/api-utils";
+import { getUserId } from "@/lib/auth/api-utils";
+import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = 'force-dynamic';
 
-type RouteParams = Record<string, never>;
+interface RouteParams {
+  params: Record<string, string>;
+}
 
-export const GET = withAuth<RouteParams>(async (req: NextRequest) => {
+export async function GET(req: NextRequest) {
+  const { userId } = auth();
+  
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const userId = getUserId(req);
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
     const privacy = searchParams.get("privacy");
@@ -33,11 +41,16 @@ export const GET = withAuth<RouteParams>(async (req: NextRequest) => {
       { status: 500 }
     );
   }
-}, { requireAuth: true });
+}
 
-export const POST = withAuth<RouteParams>(async (req: NextRequest) => {
+export async function POST(req: NextRequest) {
+  const { userId } = auth();
+  
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const userId = getUserId(req);
     const body = await req.json();
     const { title, description, category, privacy, items, listType = 'ordered' } = body;
 
@@ -106,4 +119,4 @@ export const POST = withAuth<RouteParams>(async (req: NextRequest) => {
       { status: 500 }
     );
   }
-}, { requireAuth: true }); 
+} 

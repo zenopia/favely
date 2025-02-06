@@ -7,7 +7,7 @@ export const authConfig: AuthProviderConfig = {
     "/sign-up",
     "/search",
     "/lists/:path*",
-    "/api/lists/:path*",
+    "/api/lists/:listId", // Only allow viewing individual lists
     "/api/users/:username", // Public user profile endpoint
     "/api/users/:username/follow/status", // Allow checking follow status
     "/api/webhooks/clerk",
@@ -43,13 +43,14 @@ export const authConfig: AuthProviderConfig = {
       "/api/health",
       "/api/webhooks/clerk",
       "/api/webhooks/user",
-      "/api/lists/:listId", // Individual list endpoints
+      "/api/lists/:listId", // Individual list endpoints for viewing
       "/api/users/:username", // Public user profile endpoints
       "/api/users/:username/follow/status", // Allow checking follow status
       "/api/search",
       "/api/feedback" // Add feedback endpoint to public API paths
     ],
     protectedPaths: [
+      "/api/lists", // Protect list creation
       "/api/lists/create",
       "/api/lists/edit",
       "/api/lists/delete",

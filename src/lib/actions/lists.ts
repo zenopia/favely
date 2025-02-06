@@ -33,6 +33,14 @@ interface PaginatedListsResponse {
   lastViewedMap?: Record<string, Date>;
 }
 
+interface UserCache {
+  clerkId: string;
+  username: string;
+  displayName: string;
+  imageUrl: string | null;
+  lastSynced: Date;
+}
+
 export async function getEnhancedLists(
   query: FilterQuery<MongoListDocument> = {}, 
   options: QueryOptions<MongoListDocument> = {},
@@ -287,7 +295,7 @@ export async function getSharedLists(userId: string) {
   return getEnhancedLists(query);
 }
 
-export async function getListCollaborators(listId: string): Promise<any[]> {
+export async function getListCollaborators(listId: string): Promise<UserCache[]> {
   const ListModel = await getListModel();
   const UserCacheModel = await getUserCacheModel();
 
