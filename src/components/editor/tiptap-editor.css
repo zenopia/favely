@@ -183,4 +183,63 @@
   opacity: 0.5;
   background-color: rgba(59, 130, 246, 0.1);
   cursor: move;
+}
+
+/* Drop target indicator */
+.ProseMirror .drop-target {
+  position: relative;
+}
+
+.ProseMirror .drop-target::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: rgb(59, 130, 246);
+  transform: scaleX(0.98);
+  transition: transform 0.15s ease;
+}
+
+.ProseMirror .drop-target.drop-target-top::before {
+  top: -1px;
+}
+
+.ProseMirror .drop-target.drop-target-bottom::before {
+  bottom: -1px;
+}
+
+.ProseMirror .drop-target.drop-target-active::before {
+  transform: scaleX(1);
+}
+
+.list-item {
+  position: relative;
+}
+
+.list-item.drop-target::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #3b82f6;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.list-item.drop-target.drop-target-top::before {
+  top: 0;
+}
+
+.list-item.drop-target.drop-target-bottom::before {
+  bottom: 0;
+}
+
+.list-item.drop-target.drop-target-active {
+  opacity: 0.5;
+}
+
+.list-item.is-dragging {
+  opacity: 0.5;
 } 
