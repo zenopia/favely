@@ -1,3 +1,11 @@
+/* Hide ProseMirror's default drag decoration */
+.ProseMirror-widget.ProseMirror-widget-decoration,
+.ProseMirror-decoration {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .ProseMirror {
   padding: 1rem;
   border-radius: 0.5rem;

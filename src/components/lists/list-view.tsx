@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { EnhancedList, ListItem } from "@/types/list";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import ListActionBar from "@/components/lists/list-action-bar";

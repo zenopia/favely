@@ -164,7 +164,7 @@ export async function getEnhancedLists(
       description: list.description,
       category: list.category as List['category'],
       privacy: list.privacy,
-      listType: list.listType || 'bullets',
+      listType: list.listType || 'bullet',
       owner: {
         id: list.owner.userId.toString(),
         clerkId: list.owner.clerkId,

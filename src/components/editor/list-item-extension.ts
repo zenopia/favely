@@ -2,7 +2,7 @@ import { mergeAttributes, Node } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { Plugin } from 'prosemirror-state'
 import { splitListItem } from '@tiptap/pm/schema-list'
-import { EditorView } from 'prosemirror-view'
+import { EditorView, DecorationSet, Decoration } from 'prosemirror-view'
 import { TextSelection } from 'prosemirror-state'
 import ListItemView from './list-item-view'
 import { Slice } from 'prosemirror-model'
@@ -28,9 +28,12 @@ declare module '@tiptap/core' {
 
 declare module 'prosemirror-state' {
   interface EditorProps {
+    handleDragStart?: (view: EditorView, event: DragEvent) => boolean | void
     handleDragOver?: (view: EditorView, event: DragEvent) => boolean | void
     handleDragLeave?: (view: EditorView, event: DragEvent) => boolean | void
+    handleDragEnd?: (view: EditorView, event: DragEvent) => boolean | void
     handleDrop?: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => boolean | void
+    createSelectionBetween?: (view: EditorView) => any
   }
 }
 
@@ -39,20 +42,35 @@ export interface ListItemAttributes {
   dragging?: boolean,
 }
 
+// Custom drag view to override ProseMirror's default
+class EmptyDragView {
+  slice: Slice
+  move: boolean
+
+  constructor(node: any, view: EditorView, event: DragEvent) {
+    this.slice = Slice.empty
+    this.move = false
+  }
+  
+  destroy() {}
+  update() { return false }
+  setDropPos() {}
+  get pos() { return -1 }
+}
+
 export const ListItemExtension = Node.create({
   name: 'listItem',
 
   addOptions() {
     return {
       HTMLAttributes: {},
+      draggable: false,
     }
   },
 
   content: 'paragraph block*',
 
   defining: true,
-
-  draggable: true,
 
   addStorage() {
     return {
@@ -109,18 +127,40 @@ export const ListItemExtension = Node.create({
       setListItemActive: (pos: number | null) => ({ tr, dispatch }) => {
         if (!dispatch) return true
 
-        // Clear active state from all list items
-        tr.doc.descendants((node, pos) => {
-          if (node.type.name === 'listItem') {
-            tr.setNodeMarkup(pos, undefined, { ...node.attrs, active: false })
-          }
-        })
+        try {
+          // Clear active state from all list items
+          tr.doc.descendants((node, pos) => {
+            if (node.type.name === 'listItem') {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, active: false })
+            }
+          })
 
-        // Set active state for the selected item
-        if (pos !== null) {
-          tr.setNodeMarkup(pos, undefined, { active: true })
-          this.storage.activeItemPos = pos
-        } else {
+          // Set active state for the selected item
+          if (pos !== null && tr.doc.nodeAt(pos)?.type.name === 'listItem') {
+            tr.setNodeMarkup(pos, undefined, { active: true })
+            
+            // Find the paragraph inside the list item
+            const contentPos = pos + 1
+            const contentNode = tr.doc.nodeAt(contentPos)
+            
+            if (contentNode?.type.name === 'paragraph') {
+              // Only set selection if there isn't already a selection in this node
+              const { from, to } = tr.selection
+              const nodeFrom = contentPos + 1
+              const nodeTo = contentPos + contentNode.nodeSize - 1
+              
+              if (from < nodeFrom || to > nodeTo) {
+                // Place caret at the end of content
+                tr.setSelection(TextSelection.create(tr.doc, nodeTo))
+              }
+            }
+            
+            this.storage.activeItemPos = pos
+          } else {
+            this.storage.activeItemPos = null
+          }
+        } catch (error) {
+          // If setting active state fails, clear it
           this.storage.activeItemPos = null
         }
 
@@ -148,170 +188,204 @@ export const ListItemExtension = Node.create({
       })
     }
 
-    const findListItems = (view: EditorView) => {
-      const items: { node: any, pos: number, rect?: DOMRect }[] = []
-      view.state.doc.descendants((node, pos) => {
-        if (node.type.name === 'listItem') {
-          const el = view.nodeDOM(pos) as HTMLElement
-          if (el) {
-            items.push({ 
-              node, 
-              pos,
-              rect: el.getBoundingClientRect()
-            })
-          }
-        }
-      })
-      return items.sort((a, b) => {
-        if (!a.rect || !b.rect) return 0
-        return a.rect.top - b.rect.top
-      })
-    }
-
-    const findDropPosition = (event: DragEvent, listItems: Array<{ node: any, pos: number, rect?: DOMRect }>, editorRect: DOMRect) => {
-      const relativeY = event.clientY - editorRect.top
-      const lastItem = listItems[listItems.length - 1]
-      
-      // Handle dropping at the end of the list
-      if (lastItem && lastItem.rect && relativeY > lastItem.rect.bottom - editorRect.top) {
-        return { targetPos: lastItem.pos, insertAfter: true }
-      }
-
-      // Find the closest item
-      for (let i = 0; i < listItems.length; i++) {
-        const item = listItems[i]
-        if (!item.rect) continue
-
-        const itemMiddleY = item.rect.top + (item.rect.height / 2) - editorRect.top
-        const nextItem = listItems[i + 1]
-
-        if (relativeY <= itemMiddleY) {
-          return { targetPos: item.pos, insertAfter: false }
-        }
-
-        if (!nextItem || !nextItem.rect || relativeY <= nextItem.rect.top + (nextItem.rect.height / 2) - editorRect.top) {
-          return { targetPos: item.pos, insertAfter: true }
-        }
-      }
-
-      return { targetPos: listItems[0].pos, insertAfter: false }
-    }
-
-    const updateDropTarget = (targetElement: HTMLElement, relativeY: number) => {
-      targetElement.classList.add('drop-target', 'drop-target-active')
-      if (relativeY < targetElement.getBoundingClientRect().height / 2) {
-        targetElement.classList.add('drop-target-top')
-      } else {
-        targetElement.classList.add('drop-target-bottom')
-      }
-    }
-
-    const plugin = new Plugin({
-      props: {
-        handleDragOver: (view: EditorView, event: DragEvent) => {
-          const pos = view.posAtCoords({
-            left: event.clientX,
-            top: event.clientY,
-          })?.pos
-
-          if (!pos) return false
-
-          clearDropTargets(view)
-
-          let targetElement: HTMLElement | null = null
-          view.state.doc.nodesBetween(pos, pos, (node, nodePos) => {
-            if (node.type.name === 'listItem') {
-              const domNode = view.nodeDOM(nodePos)
-              if (domNode && domNode instanceof HTMLElement) {
-                targetElement = domNode
-                return false
+    return [
+      // Plugin to disable ProseMirror's default drag behavior
+      new Plugin({
+        props: {
+          // Prevent ProseMirror from creating drag decorations
+          nodeViews: {
+            listItem: (node, view, getPos) => {
+              // Disable ProseMirror's built-in drag decoration for list items
+              return {
+                dom: document.createElement('li'),
+                contentDOM: document.createElement('div'),
+                ignoreMutation: () => true,
+                stopEvent: (event) => {
+                  return event.type.startsWith('drag')
+                }
               }
             }
-          })
-
-          if (!targetElement) return false
-
-          const rect = targetElement.getBoundingClientRect()
-          const relativeY = event.clientY - rect.top
-          updateDropTarget(targetElement, relativeY)
-
-          event.preventDefault()
-          return true
-        },
-
-        handleDragLeave: (view: EditorView, event: DragEvent) => {
-          const relatedTarget = event.relatedTarget as Element
-          if (!view.dom.contains(relatedTarget)) {
-            clearDropTargets(view)
-          }
-          return false
-        },
-
-        handleDrop: (view: EditorView, event: DragEvent, _slice: Slice, moved: boolean) => {
-          clearDropTargets(view)
-
-          const { state, dispatch } = view
-          const { activeItemPos } = this.storage
-
-          if (activeItemPos === null || !event.dataTransfer) return false
-
-          const listItems = findListItems(view)
-          if (listItems.length === 0) return false
-
-          const editorRect = view.dom.getBoundingClientRect()
-          const { targetPos, insertAfter } = findDropPosition(event, listItems, editorRect)
-
-          if (targetPos === activeItemPos) return false
-
-          const sourceNode = state.doc.nodeAt(activeItemPos)
-          if (!sourceNode) return false
-
-          const tr = state.tr
-          
-          // Move the node
-          tr.delete(activeItemPos, activeItemPos + sourceNode.nodeSize)
-          
-          let insertPos = targetPos
-          if (insertAfter) {
-            const targetNode = state.doc.nodeAt(targetPos)
-            if (targetNode) {
-              insertPos += targetNode.nodeSize
-            }
-          }
-          
-          if (insertPos > activeItemPos) {
-            insertPos -= sourceNode.nodeSize
-          }
-          
-          tr.insert(insertPos, sourceNode)
-          dispatch(tr)
-          
-          // Set active state
-          this.editor.commands.setListItemActive(insertPos)
-          
-          return true
-        },
-
-        handleClick: (view: EditorView, pos: number, event: MouseEvent) => {
-          const { state, dispatch } = view
-          const node = state.doc.nodeAt(pos)
-          
-          if (node?.type.name === 'listItem') {
-            const contentPos = pos + 1
-            const contentNode = state.doc.nodeAt(contentPos)
-            
-            if (contentNode?.type.name === 'paragraph') {
-              const tr = state.tr
-              tr.setSelection(TextSelection.near(tr.doc.resolve(contentPos + 1)))
-              dispatch(tr)
-            }
-          }
-          
-          return false
+          },
+          // Prevent selection during drag
+          createSelectionBetween: () => null,
+          // Prevent default decorations
+          decorations: () => DecorationSet.empty
         }
-      }
-    })
+      }),
 
-    return [plugin]
+      // Plugin to handle drag events
+      new Plugin({
+        props: {
+          handleDOMEvents: {
+            dragstart: (view, event) => {
+              // Prevent ProseMirror from initializing its drag state
+              if (view.dragging) {
+                view.dragging = { slice: Slice.empty, move: false }
+              }
+              event.stopPropagation()
+              return true
+            },
+            dragenter: (view, event) => {
+              event.preventDefault()
+              return true
+            },
+            dragover: (view, event) => {
+              event.preventDefault()
+              return true
+            },
+            dragleave: (view, event) => {
+              event.preventDefault()
+              clearDropTargets(view)
+              return true
+            },
+            dragend: (view, event) => {
+              event.preventDefault()
+              clearDropTargets(view)
+              if (view.dragging) {
+                view.dragging = { slice: Slice.empty, move: false }
+              }
+              return true
+            },
+            drop: (view, event) => {
+              if (view.dragging) {
+                view.dragging = { slice: Slice.empty, move: false }
+              }
+              return false
+            }
+          }
+        }
+      }),
+
+      // Our custom drag and drop plugin
+      new Plugin({
+        props: {
+          handleDrop: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => {
+            const { state, dispatch } = view
+            const { activeItemPos } = this.storage
+
+            if (activeItemPos === null) return false
+
+            // Get coordinates relative to the editor
+            const editorRect = view.dom.getBoundingClientRect()
+            const relativeY = event.clientY - editorRect.top
+
+            // Find all list items and their positions
+            const listItems: { node: any, pos: number, rect?: DOMRect }[] = []
+            state.doc.descendants((node, pos) => {
+              if (node.type.name === 'listItem') {
+                const el = view.nodeDOM(pos) as HTMLElement
+                if (el instanceof HTMLElement) {
+                  listItems.push({ 
+                    node, 
+                    pos,
+                    rect: el.getBoundingClientRect()
+                  })
+                }
+              }
+            })
+
+            if (listItems.length === 0) return false
+
+            // Sort list items by their vertical position
+            listItems.sort((a, b) => {
+              if (!a.rect || !b.rect) return 0
+              return a.rect.top - b.rect.top
+            })
+
+            // Find the target position
+            let targetPos = listItems[0].pos
+            let insertAfter = false
+
+            // Handle dropping at the end of the list
+            const lastItem = listItems[listItems.length - 1]
+            const lastItemBottom = lastItem.rect ? lastItem.rect.bottom - editorRect.top : 0
+
+            if (relativeY > lastItemBottom) {
+              targetPos = lastItem.pos
+              insertAfter = true
+            } else {
+              // Find which item we're closest to vertically
+              for (let i = 0; i < listItems.length; i++) {
+                const item = listItems[i]
+                if (!item.rect) continue
+
+                const itemMiddleY = item.rect.top + (item.rect.height / 2) - editorRect.top
+
+                if (i === listItems.length - 1 && relativeY > itemMiddleY) {
+                  targetPos = item.pos
+                  insertAfter = true
+                  break
+                }
+
+                const nextItem = listItems[i + 1]
+                if (!nextItem || !nextItem.rect) {
+                  if (relativeY <= itemMiddleY) {
+                    targetPos = item.pos
+                    insertAfter = false
+                    break
+                  }
+                  continue
+                }
+
+                const nextItemMiddleY = nextItem.rect.top + (nextItem.rect.height / 2) - editorRect.top
+
+                if (relativeY <= itemMiddleY) {
+                  targetPos = item.pos
+                  insertAfter = false
+                  break
+                } else if (relativeY <= nextItemMiddleY) {
+                  targetPos = item.pos
+                  insertAfter = true
+                  break
+                }
+              }
+            }
+
+            if (targetPos === activeItemPos) return false
+
+            const tr = state.tr
+            const sourceNode = state.doc.nodeAt(activeItemPos)
+            if (!sourceNode) return false
+
+            // Delete the node from its current position
+            tr.delete(activeItemPos, activeItemPos + sourceNode.nodeSize)
+            
+            // Adjust target position if needed
+            if (targetPos > activeItemPos) {
+              targetPos -= sourceNode.nodeSize
+            }
+            
+            // Calculate final insert position
+            let insertPos = targetPos
+            if (insertAfter) {
+              const targetNode = state.doc.nodeAt(targetPos)
+              if (targetNode) {
+                insertPos += targetNode.nodeSize
+              }
+            }
+            
+            // Insert the node at the new position
+            tr.insert(insertPos, sourceNode)
+            
+            // Update storage and dispatch
+            this.storage.activeItemPos = insertPos
+            dispatch(tr)
+
+            // Set the active state and handle the range error
+            try {
+              this.editor.commands.setListItemActive(insertPos)
+            } catch (error) {
+              // If setting active state fails, clear it
+              this.storage.activeItemPos = null
+            }
+            
+            // Clear drop targets after successful drop
+            clearDropTargets(view)
+            
+            return true
+          }
+        }
+      })
+    ]
   },
 }) 
