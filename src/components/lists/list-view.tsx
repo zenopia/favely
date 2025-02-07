@@ -1,6 +1,6 @@
 "use client";
 
-import { EnhancedList, ListItem } from "@/types/list";
+import { EnhancedList } from "@/types/list";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import ListActionBar from "@/components/lists/list-action-bar";
 import { Eye, Pin, Copy, Lock, Pen, Plus } from "lucide-react";
@@ -11,14 +11,12 @@ import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
 import { CollaboratorManagement } from "@/components/lists/collaborator-management";
 import { useAuthService } from "@/lib/services/auth.service";
 
-type CollaboratorRole = 'owner' | 'admin' | 'editor' | 'viewer';
-
 interface ListViewProps {
   list: EnhancedList;
   isOwner: boolean;
+  _isCollaborator: boolean;
   isPinned: boolean;
   isFollowing: boolean;
-  isCollaborator: boolean;
   showCollaborators: boolean;
   onCollaboratorsClick: () => void;
   onPinChange?: (isPinned: boolean) => void;
@@ -27,7 +25,7 @@ interface ListViewProps {
 export function ListView({ 
   list, 
   isOwner, 
-  isCollaborator,
+  _isCollaborator,
   isPinned, 
   isFollowing,
   showCollaborators,

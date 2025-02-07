@@ -2,10 +2,10 @@ import { mergeAttributes, Node } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { Plugin } from 'prosemirror-state'
 import { splitListItem } from '@tiptap/pm/schema-list'
-import { EditorView, DecorationSet, Decoration } from 'prosemirror-view'
+import { EditorView, DecorationSet } from 'prosemirror-view'
 import { TextSelection } from 'prosemirror-state'
 import ListItemView from './list-item-view'
-import { Slice } from 'prosemirror-model'
+import { Slice, Node as ProseMirrorNode } from 'prosemirror-model'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -33,7 +33,7 @@ declare module 'prosemirror-state' {
     handleDragLeave?: (view: EditorView, event: DragEvent) => boolean | void
     handleDragEnd?: (view: EditorView, event: DragEvent) => boolean | void
     handleDrop?: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => boolean | void
-    createSelectionBetween?: (view: EditorView) => any
+    createSelectionBetween?: (view: EditorView) => null
   }
 }
 
@@ -43,11 +43,11 @@ export interface ListItemAttributes {
 }
 
 // Custom drag view to override ProseMirror's default
-class EmptyDragView {
+class _EmptyDragView {
   slice: Slice
   move: boolean
 
-  constructor(node: any, view: EditorView, event: DragEvent) {
+  constructor(_node: ProseMirrorNode,_view: EditorView, _event: DragEvent) {
     this.slice = Slice.empty
     this.move = false
   }
@@ -194,14 +194,14 @@ export const ListItemExtension = Node.create({
         props: {
           // Prevent ProseMirror from creating drag decorations
           nodeViews: {
-            listItem: (node, view, getPos) => {
+            listItem: (_node, _view, _getPos) => {
               // Disable ProseMirror's built-in drag decoration for list items
               return {
                 dom: document.createElement('li'),
                 contentDOM: document.createElement('div'),
                 ignoreMutation: () => true,
-                stopEvent: (event) => {
-                  return event.type.startsWith('drag')
+                stopEvent: (_event) => {
+                  return _event.type.startsWith('drag')
                 }
               }
             }
@@ -246,7 +246,7 @@ export const ListItemExtension = Node.create({
               }
               return true
             },
-            drop: (view, event) => {
+            drop: (view, _event) => {
               if (view.dragging) {
                 view.dragging = { slice: Slice.empty, move: false }
               }
@@ -259,7 +259,7 @@ export const ListItemExtension = Node.create({
       // Our custom drag and drop plugin
       new Plugin({
         props: {
-          handleDrop: (view: EditorView, event: DragEvent, slice: Slice, moved: boolean) => {
+          handleDrop: (view: EditorView, event: DragEvent, _slice: Slice, _moved: boolean) => {
             const { state, dispatch } = view
             const { activeItemPos } = this.storage
 
@@ -270,7 +270,7 @@ export const ListItemExtension = Node.create({
             const relativeY = event.clientY - editorRect.top
 
             // Find all list items and their positions
-            const listItems: { node: any, pos: number, rect?: DOMRect }[] = []
+            const listItems: { node: ProseMirrorNode, pos: number, rect?: DOMRect }[] = []
             state.doc.descendants((node, pos) => {
               if (node.type.name === 'listItem') {
                 const el = view.nodeDOM(pos) as HTMLElement

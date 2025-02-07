@@ -3,13 +3,18 @@ import connectToMongoDB from "@/lib/db/mongodb";
 import { getListModel, ListDocument } from "@/lib/db/models-v2/list";
 import { getEnhancedLists } from "@/lib/actions/lists";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import { getUserId } from "@/lib/auth/api-utils";
 import { auth } from "@clerk/nextjs/server";
 
 export const dynamic = 'force-dynamic';
 
-interface RouteParams {
+interface _RouteParams {
   params: Record<string, string>;
+}
+
+interface ListQuery {
+  "owner.clerkId": string;
+  category?: string;
+  privacy?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -23,7 +28,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
     const privacy = searchParams.get("privacy");
-    const query: any = { "owner.clerkId": userId };
+    const query: ListQuery = { "owner.clerkId": userId };
 
     if (category) {
       query.category = category;

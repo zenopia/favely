@@ -1,23 +1,21 @@
 import React, { useEffect, useRef } from 'react'
-import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
+import { NodeViewWrapper, NodeViewContent, Editor, Extension } from '@tiptap/react'
 import { ListItemAttributes } from './list-item-extension'
-import { Node } from 'prosemirror-model'
-import { Transaction } from 'prosemirror-state'
 
 interface ListItemViewProps {
   node: {
     attrs: ListItemAttributes
   }
   selected: boolean
-  extension: any
+  _extension?: Extension
   getPos: () => number
-  editor: any
+  editor: Editor
 }
 
 export default function ListItemView({
   node,
   selected,
-  extension,
+  _extension,
   getPos,
   editor,
 }: ListItemViewProps) {
@@ -25,7 +23,7 @@ export default function ListItemView({
   const ref = useRef<HTMLDivElement>(null)
   const dragHandleRef = useRef<HTMLDivElement>(null)
 
-  const handleClick = (event: React.MouseEvent) => {
+  const handleClick = (_event: React.MouseEvent) => {
     const pos = getPos()
     editor.commands.setListItemActive(pos)
   }
@@ -158,7 +156,7 @@ export default function ListItemView({
       dragHandle.removeEventListener('touchmove', touchMoveHandler)
       dragHandle.removeEventListener('touchend', touchEndHandler)
     }
-  }, [])
+  }, [editor.commands, editor.view.dom, getPos])
 
   return (
     <NodeViewWrapper 
