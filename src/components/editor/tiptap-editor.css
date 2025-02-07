@@ -135,7 +135,7 @@
   position: relative;
   margin: 0.2rem 0;
   padding: 0.5rem;
-  padding-left: 2.5rem;
+  padding-left: 1.75rem;
   border-radius: 0.5rem;
   cursor: pointer;
   background-color: transparent;
@@ -158,7 +158,7 @@
 /* Drag handle */
 .ProseMirror .list-item .drag-handle {
   position: absolute;
-  left: 0.75rem;
+  left: 0.25rem;
   top: 50%;
   transform: translateY(-50%);
   font-size: 1.2rem;
