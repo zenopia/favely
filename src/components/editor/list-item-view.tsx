@@ -1,6 +1,10 @@
-import React, { useEffect, useRef } from 'react'
-import { NodeViewWrapper, NodeViewContent, Editor, Extension } from '@tiptap/react'
+import { useEffect, useRef, useState, useMemo } from 'react'
+import { NodeViewWrapper, NodeViewContent, Editor, Extension, NodeViewProps } from '@tiptap/react'
+import { createPortal } from 'react-dom'
 import { ListItemAttributes } from './list-item-extension'
+import categoryTags from '@/lib/tagMappings'
+import { Tag } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface ListItemViewProps {
   node: {
@@ -19,14 +23,99 @@ export default function ListItemView({
   getPos,
   editor,
 }: ListItemViewProps) {
-  const { active, dragging } = node.attrs
+  const { active, dragging, tag, category } = node.attrs as ListItemAttributes
   const ref = useRef<HTMLDivElement>(null)
   const dragHandleRef = useRef<HTMLDivElement>(null)
+  const tagButtonRef = useRef<HTMLDivElement>(null)
+  const [showTagMenu, setShowTagMenu] = useState(false)
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
+  const categoryRef = useRef(category)
 
-  const handleClick = (_event: React.MouseEvent) => {
+  // Memoize available tags to prevent unnecessary recalculations
+  const availableTags = useMemo(() => {
+    if (!category || category === categoryRef.current) {
+      return categoryRef.current && categoryRef.current in categoryTags 
+        ? categoryTags[categoryRef.current as keyof typeof categoryTags] 
+        : []
+    }
+    categoryRef.current = category
+    return category in categoryTags ? categoryTags[category as keyof typeof categoryTags] : []
+  }, [category])
+
+  const handleClick = (event: React.MouseEvent) => {
+    event.stopPropagation()
     const pos = getPos()
-    editor.commands.setListItemActive(pos)
+    
+    // First, deactivate all list items
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'listItem') {
+        editor.commands.command(({ tr }) => {
+          tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            active: false
+          })
+          return true
+        })
+      }
+    })
+
+    // Then activate only the clicked item
+    editor.commands.command(({ tr }) => {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        active: true
+      })
+      return true
+    })
   }
+
+  const handleTagClick = (event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    
+    if (tagButtonRef.current) {
+      const rect = tagButtonRef.current.getBoundingClientRect()
+      setMenuPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX
+      })
+    }
+    
+    setShowTagMenu(prev => !prev)
+  }
+
+  const handleTagSelect = (selectedTag: string) => {
+    event?.preventDefault()
+    const pos = getPos()
+    editor.commands.command(({ tr }) => {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        tag: selectedTag
+      })
+      return true
+    })
+    setShowTagMenu(false)
+  }
+
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      tagButtonRef.current && 
+      !tagButtonRef.current.contains(event.target as Node) &&
+      !document.querySelector('.tag-menu')?.contains(event.target as Node)
+    ) {
+      setShowTagMenu(false)
+    }
+  }
+
+  useEffect(() => {
+    if (showTagMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showTagMenu])
+
+  console.log('Category:', category);
+  console.log('Available Tags:', availableTags);
 
   const handleDragStart = (event: React.DragEvent) => {
     event.stopPropagation()
@@ -159,27 +248,72 @@ export default function ListItemView({
   }, [editor.commands, editor.view.dom, getPos])
 
   return (
-    <NodeViewWrapper 
-      as="li" 
-      ref={ref}
-      className={`list-item ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${dragging ? 'is-dragging' : ''}`}
-      onClick={handleClick}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <div 
-        ref={dragHandleRef}
-        className="drag-handle" 
-        contentEditable={false}
-        data-drag-handle
-        draggable="true"
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
+    <>
+      <NodeViewWrapper 
+        as="li" 
+        ref={ref}
+        className={`list-item ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${dragging ? 'is-dragging' : ''}`}
+        onClick={handleClick}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        data-category={category}
       >
-        ⋮⋮
-      </div>
-      <NodeViewContent className="list-item-content" />
-    </NodeViewWrapper>
+        <div 
+          ref={dragHandleRef}
+          className="drag-handle" 
+          contentEditable={false}
+          data-drag-handle
+          draggable="true"
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          ⋮⋮
+        </div>
+
+        <div 
+          ref={tagButtonRef}
+          className={cn(
+            'tag-button',
+            tag ? 'has-tag' : 'no-tag'
+          )}
+          contentEditable={false} 
+          onClick={handleTagClick}
+        >
+          {tag ? tag : <Tag className="h-4 w-4" />}
+        </div>
+
+        <NodeViewContent className="list-item-content" />
+      </NodeViewWrapper>
+
+      {showTagMenu && createPortal(
+        <div 
+          className="tag-bubble-menu"
+          style={{
+            position: 'absolute',
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+            zIndex: 50,
+          }}
+        >
+          <div className="tag-menu">
+            {availableTags.map((availableTag: string) => (
+              <button
+                key={availableTag}
+                className={cn(
+                  "tag-menu-item",
+                  tag === availableTag && "active"
+                )}
+                onClick={() => handleTagSelect(availableTag)}
+                type="button"
+              >
+                {availableTag}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   )
 } 

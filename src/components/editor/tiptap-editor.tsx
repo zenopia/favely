@@ -1,12 +1,20 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import BubbleMenu from '@tiptap/extension-bubble-menu'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { ListOrdered, List } from 'lucide-react'
-import { useState } from 'react'
+import { ListOrdered, List, IndentIcon, OutdentIcon } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import { TextSelection } from 'prosemirror-state'
+import { EditorView } from 'prosemirror-view'
 import { ListItemExtension } from './list-item-extension'
+import { SubListItemExtension } from './sub-list-item-extension'
 import './tiptap-editor.css'
+
+export type ListType = 'ordered' | 'bullet' | 'task'
 
 interface TiptapEditorProps {
   content?: string
@@ -16,11 +24,10 @@ interface TiptapEditorProps {
   className?: string
   editable?: boolean
   placeholder?: string
+  category?: string
 }
 
-export type ListType = 'ordered' | 'bullet' | 'task'
-
-export function TiptapEditor({
+function TiptapEditorComponent({
   content = '',
   onChange,
   onListTypeChange,
@@ -28,14 +35,76 @@ export function TiptapEditor({
   className,
   editable = true,
   placeholder = 'Start typing...',
+  category,
 }: TiptapEditorProps) {
   const [currentListType, setCurrentListType] = useState<ListType>(defaultListType)
   const [isDragging, setIsDragging] = useState(false)
+  const initialCategoryRef = useRef(category)
+  const editorRef = useRef<ReturnType<typeof useEditor> | null>(null)
+
+  const handleKeyDown = (view: EditorView, event: KeyboardEvent): boolean => {
+    if (!editorRef.current) return false
+    
+    const { state } = view
+    const { selection } = state
+    const { $from } = selection
+    const pos = $from.before()
+    const node = state.doc.nodeAt(pos)
+
+    // Handle Tab key for indentation
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      
+      if (!event.shiftKey) {
+        // Check if we're already in a nested list
+        const grandParent = $from.node(-3)
+        const isInNestedList = grandParent && grandParent.type.name === 'listItem'
+        
+        if (isInNestedList) {
+          // Already nested, don't allow further nesting
+          return true
+        }
+
+        if (node && node.type.name === 'listItem') {
+          // Convert directly to sub-list item
+          const tr = state.tr
+          const subListItem = state.schema.nodes.subListItem.create(
+            { 
+              category: initialCategoryRef.current,
+              depth: 0
+            },
+            node.content
+          )
+
+          tr.replaceWith(pos, pos + node.nodeSize, subListItem)
+          editorRef.current.view.dispatch(tr)
+          return true
+        }
+      } else {
+        // Handle outdenting
+        if (node && node.type.name === 'subListItem') {
+          // Convert back to regular list item
+          const tr = state.tr
+          const listItem = state.schema.nodes.listItem.create(
+            {},
+            node.content
+          )
+
+          tr.replaceWith(pos, pos + node.nodeSize, listItem)
+          editorRef.current.view.dispatch(tr)
+          return true
+        } else {
+          return editorRef.current.commands.liftListItem()
+        }
+      }
+    }
+
+    return false
+  }
 
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Keep paragraph but disable other block nodes
         horizontalRule: false,
         heading: false,
         blockquote: false,
@@ -43,28 +112,44 @@ export function TiptapEditor({
         orderedList: {
           keepMarks: true,
           keepAttributes: false,
+          itemTypeName: 'listItem',
         },
         bulletList: {
           keepMarks: true,
           keepAttributes: false,
+          itemTypeName: 'listItem',
         },
-        listItem: false, // Disable default list item to use our custom one
+        listItem: false,
       }),
-      ListItemExtension,
+      ListItemExtension.configure({
+        nested: true,
+        HTMLAttributes: {
+          category: initialCategoryRef.current,
+        },
+      }),
+      SubListItemExtension.configure({
+        HTMLAttributes: {
+          category: initialCategoryRef.current,
+        },
+      }),
+      BubbleMenu.configure({
+        pluginKey: 'tagBubbleMenu',
+        shouldShow: () => false,
+      }),
     ],
     content,
     editable,
-    immediatelyRender: false,
     onCreate: ({ editor }) => {
+      editorRef.current = editor
+
+      // Set initial content
       if (!content) {
-        // For new content, create an empty list
         editor
           .chain()
           .setContent(`<ol><li>${placeholder}</li></ol>`)
           .focus()
           .run()
       } else {
-        // For existing content, ensure it's in a list
         const tempDiv = document.createElement('div')
         tempDiv.innerHTML = content
         const items = Array.from(tempDiv.querySelectorAll('li'))
@@ -78,179 +163,278 @@ export function TiptapEditor({
           .run()
       }
 
-      // Set the list type based on defaultListType
       if (defaultListType === 'bullet') {
         editor.chain().toggleBulletList().run()
       }
       setCurrentListType(defaultListType)
-    },
-    onSelectionUpdate: ({ editor }) => {
-      // Only update active state if we're not dragging
-      if (!isDragging) {
-        let foundListItem = false
-        editor.state.doc.nodesBetween(editor.state.selection.from, editor.state.selection.to, (node, pos) => {
-          if (node.type.name === 'listItem' && !foundListItem) {
-            editor.commands.setListItemActive(pos)
-            foundListItem = true
-            return false
+
+      // Set initial category
+      if (initialCategoryRef.current) {
+        editor.state.doc.descendants((node, pos) => {
+          if (node.type.name === 'listItem' || node.type.name === 'subListItem') {
+            editor.commands.command(({ tr }) => {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                category: initialCategoryRef.current
+              })
+              return true
+            })
           }
         })
-
-        // If no list item was found in the selection, clear active state
-        if (!foundListItem) {
-          editor.commands.setListItemActive(null)
-        }
       }
     },
+    onDestroy: () => {
+      editorRef.current = null
+    },
     onUpdate: ({ editor }) => {
-      // Check if editor is completely empty (no list structure)
-      if (editor.isEmpty) {
-        editor
-          .chain()
-          .setContent(`<${getListTag(currentListType)}><li><p>${placeholder}</p></li></${getListTag(currentListType)}>`)
-          .focus()
-          .run()
-      }
-
-      // Only call onChange if we have a handler
       if (onChange) {
         onChange(editor.getHTML())
       }
     },
     editorProps: {
       attributes: {
-        class: 'prose dark:prose-invert focus:outline-none max-w-none',
-        'data-placeholder': placeholder,
+        class: cn(
+          'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
+          className
+        ),
       },
-      handleDOMEvents: {
-        dragstart: (view, event) => {
-          if (event.target instanceof HTMLElement && event.target.closest('[data-drag-handle]')) {
-            setIsDragging(true)
-            return true
-          }
-          return false
-        },
-        drop: (view, event) => {
-          setIsDragging(false)
-          return false
-        },
-        dragend: (view, event) => {
-          setIsDragging(false)
-          return false
-        },
-      },
-      handleKeyDown: (view, event) => {
-        const { state } = view
-        const { selection } = state
-        const { empty, $head } = selection
-
-        // Handle Backspace key
-        if (event.key === 'Backspace' && empty) {
-          // If we're at the start of a list item
-          if ($head.parentOffset === 0) {
-            const listNode = $head.node(-2) // Get the parent list node
-            const listItemNode = $head.node(-1) // Get the current list item node
-            const listItemPos = $head.before(-1) // Get position before current list item
-            const isFirstItem = $head.index(-2) === 0 // Check if this is the first item
-            
-            // If this is the last item in the list and it's empty
-            if (listNode.childCount === 1 && listItemNode.textContent === '') {
-              return true // Prevent deletion to keep at least one item
-            }
-
-            // If this is the first item, prevent exiting list format
-            if (isFirstItem) {
-              return true
-            }
-
-            // If we're not the first item and we're empty
-            if (listItemPos > 0 && listItemNode.textContent === '') {
-              // Delete current item and move to end of previous item
-              const tr = state.tr.delete(listItemPos, listItemPos + listItemNode.nodeSize)
-              const prevNode = $head.node(-2).child($head.index(-2) - 1)
-              const prevPos = listItemPos - prevNode.nodeSize
-              tr.setSelection(TextSelection.create(tr.doc, prevPos + prevNode.nodeSize - 2))
-              view.dispatch(tr)
-              return true
-            }
-          }
-        }
-
-        return false
-      },
+      handleKeyDown,
     },
-    autofocus: 'end',
   })
 
-  const setListType = (type: ListType) => {
+  // Only update category when it changes
+  useEffect(() => {
+    if (editorRef.current && category !== initialCategoryRef.current) {
+      initialCategoryRef.current = category
+      editorRef.current.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'listItem' || node.type.name === 'subListItem') {
+          editorRef.current?.commands.command(({ tr }) => {
+            tr.setNodeMarkup(pos, undefined, {
+              ...node.attrs,
+              category
+            })
+            return true
+          })
+        }
+      })
+    }
+  }, [category])
+
+  const handleIndent = (e: React.MouseEvent) => {
+    e.preventDefault()
     if (!editor) return
     
-    // Don't do anything if trying to toggle the current type
-    if (type === 'bullet' && editor.isActive('bulletList')) return
-    if (type === 'ordered' && editor.isActive('orderedList')) return
+    const { state } = editor
+    const { selection } = state
+    const { $from } = selection
+    const pos = $from.before()
+    const node = state.doc.nodeAt(pos)
+    const parentList = $from.node(-2)
+    const isInList = parentList && (parentList.type.name === 'bulletList' || parentList.type.name === 'orderedList')
     
-    setCurrentListType(type)
-    if (onListTypeChange) {
-      onListTypeChange(type)
+    if (!isInList || !node) return
+
+    // Check if we're already in a nested list
+    const grandParent = $from.node(-3)
+    const isInNestedList = grandParent && grandParent.type.name === 'listItem'
+    
+    if (isInNestedList) {
+      // Already nested, don't allow further nesting
+      return
     }
 
-    // First ensure we're in a list
-    if (editor.isEmpty) {
-      editor.chain().setContent(`<li>${placeholder}</li>`).focus().run()
+    if (node.type.name === 'listItem') {
+      // Convert directly to sub-list item
+      const tr = state.tr
+      const subListItem = state.schema.nodes.subListItem.create(
+        { 
+          category: initialCategoryRef.current,
+          depth: 0
+        },
+        node.content
+      )
+
+      tr.replaceWith(pos, pos + node.nodeSize, subListItem)
+      editor.view.dispatch(tr)
+    }
+  }
+
+  const handleOutdent = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!editor) return
+    
+    const { state } = editor
+    const { selection } = state
+    const { $from } = selection
+    const pos = $from.before()
+    const node = state.doc.nodeAt(pos)
+
+    if (node && node.type.name === 'subListItem') {
+      // Convert back to regular list item
+      const tr = state.tr
+      const listItem = state.schema.nodes.listItem.create(
+        {},
+        node.content
+      )
+
+      tr.replaceWith(pos, pos + node.nodeSize, listItem)
+      editor.view.dispatch(tr)
+    } else {
+      editor.commands.liftListItem()
+    }
+  }
+
+  const handleListTypeChange = (type: ListType) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!editor) return
+    
+    // Get the current selection and find the list we need to toggle
+    const { state } = editor
+    const { selection } = state
+    const $from = selection.$from
+    let depth = $from.depth
+    let foundList = false
+    
+    // Find the closest list node
+    while (depth > 0) {
+      const node = $from.node(depth)
+      if (node.type.name === 'bulletList' || node.type.name === 'orderedList') {
+        foundList = true
+        break
+      }
+      depth--
     }
     
-    // Toggle the appropriate list type
-    if (type === 'bullet') {
-      editor.chain().toggleBulletList().run()
+    if (foundList) {
+      // We're in a list, so toggle it
+      if (type === 'bullet') {
+        editor.chain().toggleBulletList().run()
+      } else {
+        editor.chain().toggleOrderedList().run()
+      }
     } else {
-      editor.chain().toggleOrderedList().run()
+      // Not in a list, create a new one
+      setCurrentListType(type)
+      if (onListTypeChange) {
+        onListTypeChange(type)
+      }
+
+      if (editor.isEmpty) {
+        editor.chain().setContent(`<li><p>${placeholder}</p></li>`).focus().run()
+      }
+      
+      if (type === 'bullet') {
+        editor.chain().toggleBulletList().run()
+      } else {
+        editor.chain().toggleOrderedList().run()
+      }
     }
   }
 
   const isListType = (type: ListType): boolean => {
     if (!editor) return type === currentListType
-    return type === 'bullet' 
-      ? editor.isActive('bulletList')
-      : editor.isActive('orderedList')
+    
+    // Get the current node's parent list type
+    const { state } = editor
+    const { selection } = state
+    const $from = selection.$from
+    let depth = $from.depth
+    
+    // Find the closest parent list
+    while (depth > 0) {
+      const node = $from.node(depth)
+      if (node.type.name === 'bulletList' || node.type.name === 'orderedList') {
+        return type === 'bullet' ? node.type.name === 'bulletList' : node.type.name === 'orderedList'
+      }
+      depth--
+    }
+    
+    return type === currentListType
   }
 
   const getListTag = (type: ListType) => {
     switch (type) {
       case 'bullet':
-        return 'ul';
+        return 'ul'
       case 'ordered':
-      case 'task':
-        return 'ol';
+        return 'ol'
       default:
-        return 'ol';
+        return 'ol'
     }
   }
 
+  if (!editor) {
+    return null
+  }
+
   return (
-    <div className={cn('w-full space-y-2', className)}>
-      <div className="flex items-center gap-1 pb-2 border-b">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-2">
         <Button
-          variant={isListType('ordered') ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setListType('ordered' as ListType)}
           type="button"
-          className="gap-2"
+          variant="ghost"
+          size="sm"
+          onClick={handleListTypeChange('ordered')}
+          className={cn(
+            'hover:bg-muted',
+            isListType('ordered') && 'bg-muted'
+          )}
         >
           <ListOrdered className="h-4 w-4" />
-          <span className="hidden sm:inline">Numbered</span>
         </Button>
         <Button
-          variant={isListType('bullet') ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setListType('bullet' as ListType)}
           type="button"
-          className="gap-2"
+          variant="ghost"
+          size="sm"
+          onClick={handleListTypeChange('bullet')}
+          className={cn(
+            'hover:bg-muted',
+            isListType('bullet') && 'bg-muted'
+          )}
         >
           <List className="h-4 w-4" />
-          <span className="hidden sm:inline">Bullet</span>
+        </Button>
+        <div className="w-px h-4 bg-muted mx-2" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleIndent}
+          title="Indent (Tab)"
+          className="hover:bg-muted"
+        >
+          <IndentIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleOutdent}
+          title="Outdent (Shift+Tab)"
+          className="hover:bg-muted"
+        >
+          <OutdentIcon className="h-4 w-4" />
         </Button>
       </div>
       <EditorContent editor={editor} />
     </div>
   )
-} 
+}
+
+// Create a client-only wrapper component
+function ClientOnlyTiptapEditor(props: TiptapEditorProps) {
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted) {
+    return null
+  }
+
+  return <TiptapEditorComponent {...props} />
+}
+
+// Export the client-only version
+export const TiptapEditor = ClientOnlyTiptapEditor 

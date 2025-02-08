@@ -1,7 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { Plugin } from 'prosemirror-state'
-import { splitListItem } from '@tiptap/pm/schema-list'
+import { splitListItem, liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
 import { EditorView, DecorationSet } from 'prosemirror-view'
 import { TextSelection } from 'prosemirror-state'
 import ListItemView from './list-item-view'
@@ -19,9 +19,21 @@ declare module '@tiptap/core' {
        */
       setListItemActive: (pos: number | null) => ReturnType,
       /**
+       * Set a tag for the list item
+       */
+      setListItemTag: (tag: string) => ReturnType,
+      /**
        * Split list item at current position
        */
       splitListItem: () => ReturnType,
+      /**
+       * Sink the list item down into an inner list
+       */
+      sinkListItem: () => ReturnType,
+      /**
+       * Lift the list item up from the inner list
+       */
+      liftListItem: () => ReturnType,
     }
   }
 }
@@ -40,6 +52,8 @@ declare module 'prosemirror-state' {
 export interface ListItemAttributes {
   active?: boolean,
   dragging?: boolean,
+  tag?: string,
+  category?: string,
 }
 
 // Custom drag view to override ProseMirror's default
@@ -64,9 +78,12 @@ export const ListItemExtension = Node.create({
   addOptions() {
     return {
       HTMLAttributes: {},
-      draggable: false,
+      draggable: true,
+      nested: true,
     }
   },
+
+  group: 'listItem',
 
   content: 'paragraph block*',
 
@@ -75,6 +92,7 @@ export const ListItemExtension = Node.create({
   addStorage() {
     return {
       activeItemPos: null as number | null,
+      isDragging: false,
     }
   },
 
@@ -98,6 +116,26 @@ export const ListItemExtension = Node.create({
             return {}
           }
           return { 'data-dragging': 'true' }
+        },
+      },
+      tag: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-tag'),
+        renderHTML: attributes => {
+          if (!attributes.tag) {
+            return {}
+          }
+          return { 'data-tag': attributes.tag }
+        },
+      },
+      category: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-category'),
+        renderHTML: attributes => {
+          if (!attributes.category) {
+            return {}
+          }
+          return { 'data-category': attributes.category }
         },
       },
     }
@@ -135,26 +173,9 @@ export const ListItemExtension = Node.create({
             }
           })
 
-          // Set active state for the selected item
+          // Set active state for the selected item only
           if (pos !== null && tr.doc.nodeAt(pos)?.type.name === 'listItem') {
             tr.setNodeMarkup(pos, undefined, { active: true })
-            
-            // Find the paragraph inside the list item
-            const contentPos = pos + 1
-            const contentNode = tr.doc.nodeAt(contentPos)
-            
-            if (contentNode?.type.name === 'paragraph') {
-              // Only set selection if there isn't already a selection in this node
-              const { from, to } = tr.selection
-              const nodeFrom = contentPos + 1
-              const nodeTo = contentPos + contentNode.nodeSize - 1
-              
-              if (from < nodeFrom || to > nodeTo) {
-                // Place caret at the end of content
-                tr.setSelection(TextSelection.create(tr.doc, nodeTo))
-              }
-            }
-            
             this.storage.activeItemPos = pos
           } else {
             this.storage.activeItemPos = null
@@ -166,8 +187,49 @@ export const ListItemExtension = Node.create({
 
         return true
       },
+      setListItemTag: (tag: string) => ({ tr, state, dispatch }) => {
+        const { selection } = state
+        const position = selection.$anchor.pos
+        const node = state.doc.nodeAt(position)
+        
+        if (!node || node.type.name !== 'listItem') return false
+        
+        if (dispatch) {
+          tr.setNodeMarkup(position, undefined, {
+            ...node.attrs,
+            tag,
+          })
+          return dispatch(tr)
+        }
+        
+        return true
+      },
       splitListItem: () => ({ state, dispatch }) => {
         return splitListItem(state.schema.nodes.listItem)(state, dispatch)
+      },
+      sinkListItem: () => ({ state, dispatch }) => {
+        // Only allow sinking if we're not already in a nested list
+        const { $from } = state.selection
+        const grandParent = $from.node(-3)
+        if (grandParent && grandParent.type.name === 'listItem') {
+          // Already nested, don't allow further nesting
+          return false
+        }
+        return sinkListItem(state.schema.nodes.listItem)(state, dispatch)
+      },
+      liftListItem: () => ({ state, dispatch }) => {
+        // Only allow lifting if we're not in the outermost list
+        const { $from } = state.selection
+        const grandParent = $from.node(-3)
+        const greatGrandParent = $from.node(-4)
+        
+        // If we're in a nested list (has listItem grandparent)
+        if (grandParent && grandParent.type.name === 'listItem') {
+          return liftListItem(state.schema.nodes.listItem)(state, dispatch)
+        }
+        
+        // Don't allow lifting from the outermost list
+        return false
       },
     }
   },
@@ -177,10 +239,17 @@ export const ListItemExtension = Node.create({
       Enter: () => {
         return this.editor.commands.splitListItem()
       },
+      Tab: () => {
+        return this.editor.commands.sinkListItem()
+      },
+      'Shift-Tab': () => {
+        return this.editor.commands.liftListItem()
+      },
     }
   },
 
   addProseMirrorPlugins() {
+    const extension = this
     const clearDropTargets = (view: EditorView) => {
       const domNodes = view.dom.querySelectorAll('.drop-target')
       domNodes.forEach((el: Element) => {
@@ -218,40 +287,20 @@ export const ListItemExtension = Node.create({
         props: {
           handleDOMEvents: {
             dragstart: (view, event) => {
-              // Prevent ProseMirror from initializing its drag state
-              if (view.dragging) {
-                view.dragging = { slice: Slice.empty, move: false }
-              }
-              event.stopPropagation()
-              return true
-            },
-            dragenter: (view, event) => {
-              event.preventDefault()
-              return true
-            },
-            dragover: (view, event) => {
-              event.preventDefault()
-              return true
-            },
-            dragleave: (view, event) => {
-              event.preventDefault()
-              clearDropTargets(view)
-              return true
-            },
-            dragend: (view, event) => {
-              event.preventDefault()
-              clearDropTargets(view)
-              if (view.dragging) {
-                view.dragging = { slice: Slice.empty, move: false }
-              }
-              return true
-            },
-            drop: (view, _event) => {
-              if (view.dragging) {
-                view.dragging = { slice: Slice.empty, move: false }
+              if (event.target instanceof HTMLElement && event.target.closest('[data-drag-handle]')) {
+                extension.storage.isDragging = true
+                return true
               }
               return false
-            }
+            },
+            drop: (view, event) => {
+              extension.storage.isDragging = false
+              return false
+            },
+            dragend: (view, event) => {
+              extension.storage.isDragging = false
+              return false
+            },
           }
         }
       }),

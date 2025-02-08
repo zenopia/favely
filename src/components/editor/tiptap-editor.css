@@ -21,22 +21,25 @@
 /* Basic list styles */
 .ProseMirror ul,
 .ProseMirror ol {
-  padding: 0 1.2rem;
+  padding-left: 1.5rem !important;
   margin: 0.5rem 0;
+  list-style-position: outside !important;
 }
 
 .ProseMirror ul {
-  list-style-type: disc;
+  list-style-type: disc !important;
 }
 
 .ProseMirror ol {
-  list-style-type: decimal;
+  list-style-type: decimal !important;
 }
 
 .ProseMirror li {
   position: relative;
   margin: 0.2rem 0;
   padding: 0.2rem 0;
+  display: list-item !important;
+  list-style-position: outside !important;
 }
 
 .ProseMirror li > p {
@@ -135,12 +138,196 @@
   position: relative;
   margin: 0.2rem 0;
   padding: 0.5rem;
-  padding-left: 1.75rem;
+  padding-left: 2.5rem; /* Space for drag handle only */
   border-radius: 0.5rem;
   cursor: pointer;
   background-color: transparent;
   border: 2px solid transparent;
   transition: all 0.2s ease;
+  min-height: 2.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* Space between elements */
+}
+
+/* Tag styles for both list items and sub-list items */
+.ProseMirror .list-item .tag-button,
+.ProseMirror .sub-list-item .tag-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto; /* Don't grow or shrink */
+  padding: 0.4rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  pointer-events: auto !important;
+  user-select: none;
+  background-color: white;
+  border: 1px dashed gray;
+  color: #94a3b8;
+  min-width: 32px;
+  max-width: max-content;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  margin-right:0.4rem;
+}
+
+.ProseMirror .list-item .tag-button:hover,
+.ProseMirror .sub-list-item .tag-button:hover {
+  background-color: #f1f5f9;
+  border-color: #64748b;
+  color: #64748b;
+}
+
+.ProseMirror .list-item .tag-button.has-tag,
+.ProseMirror .sub-list-item .tag-button.has-tag {
+  background-color: #e2e8f0;
+  color: #475569;
+  border-color: transparent;
+  min-width: auto; /* Allow button to grow with content */
+  padding: 0.2rem 0.2rem; /* Increase horizontal padding for text */
+}
+
+.ProseMirror .list-item .tag-button.has-tag:hover,
+.ProseMirror .sub-list-item .tag-button.has-tag:hover {
+  background-color: #cbd5e1;
+  border-color: #94a3b8;
+}
+
+/* Tag bubble menu styles */
+.tag-bubble-menu {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  padding: 0.5rem;
+  z-index: 50;
+  min-width: 150px;
+  border: 1px solid #e2e8f0;
+}
+
+.tag-bubble-menu .tag-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tag-bubble-menu .tag-menu-item {
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+  text-align: left;
+  font-size: 0.875rem;
+  color: #1f2937;
+  background: transparent;
+  border: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.tag-bubble-menu .tag-menu-item:hover {
+  background-color: #f3f4f6;
+}
+
+.tag-bubble-menu .tag-menu-item.active {
+  background-color: #e2e8f0;
+  color: #475569;
+}
+
+.tag-bubble-menu .tag-menu-item:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Drag handle */
+.ProseMirror .list-item .drag-handle,
+.ProseMirror .sub-list-item .drag-handle {
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #64748b;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  cursor: move;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  padding: 0.25rem;
+  z-index: 10;
+}
+
+/* Show drag handle for active and selected items */
+.ProseMirror .list-item.is-active .drag-handle,
+.ProseMirror .list-item.is-selected .drag-handle,
+.ProseMirror .list-item:hover .drag-handle,
+.ProseMirror .sub-list-item.is-active .drag-handle,
+.ProseMirror .sub-list-item.is-selected .drag-handle,
+.ProseMirror .sub-list-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.ProseMirror .list-item.is-active .drag-handle,
+.ProseMirror .list-item.is-selected .drag-handle,
+.ProseMirror .sub-list-item.is-active .drag-handle,
+.ProseMirror .sub-list-item.is-selected .drag-handle {
+  color: rgb(59, 130, 246);
+}
+
+/* Active and selected states */
+.ProseMirror .list-item.is-active,
+.ProseMirror .list-item.is-selected,
+.ProseMirror .sub-list-item.is-active,
+.ProseMirror .sub-list-item.is-selected {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgb(59, 130, 246);
+}
+
+/* Ensure proper spacing for nested lists */
+.ProseMirror li > ul,
+.ProseMirror li > ol {
+  margin: 0.2rem 0;
+  padding-left: 1rem !important;
+}
+
+/* Adjust spacing for nested items */
+.ProseMirror .list-item .list-item {
+  margin-left: 0;
+  padding-left: 2rem;
+}
+
+/* Sub-list item styles */
+.ProseMirror .sub-list-item {
+  position: relative;
+  margin: 0.2rem 0;
+  padding: 0.5rem;
+  padding-left: 6rem; /* Match the padding of regular list items */
+  border-radius: 0.5rem;
+  cursor: pointer;
+  background-color: transparent;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  min-height: 2.5rem;
+  display: flex;
+  align-items: center;
+  margin-left: 2rem; /* Indentation for sub-list items */
+}
+
+/* List item content */
+.ProseMirror .list-item .list-item-content,
+.ProseMirror .sub-list-item .sub-list-item-content {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Active state */
@@ -153,6 +340,37 @@
 .ProseMirror .list-item.is-selected {
   background-color: rgba(59, 130, 246, 0.2);
   border-color: rgb(59, 130, 246);
+}
+
+/* Ensure nested list items don't inherit parent's active/selected state */
+.ProseMirror .list-item.is-active > ul > li:not(.is-active),
+.ProseMirror .list-item.is-active > ol > li:not(.is-active),
+.ProseMirror .list-item.is-selected > ul > li:not(.is-selected),
+.ProseMirror .list-item.is-selected > ol > li:not(.is-selected) {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Ensure nested list items can have their own active/selected state */
+.ProseMirror .list-item > ul > li.is-active,
+.ProseMirror .list-item > ol > li.is-active,
+.ProseMirror .list-item > ul > li.is-selected,
+.ProseMirror .list-item > ol > li.is-selected {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgb(59, 130, 246);
+}
+
+/* Ensure proper spacing for nested lists */
+.ProseMirror li > ul,
+.ProseMirror li > ol {
+  margin: 0.2rem 0;
+  padding-left: 1rem !important;
+}
+
+/* Adjust spacing for nested items */
+.ProseMirror .list-item .list-item {
+  margin-left: 0;
+  padding-left: 2rem;
 }
 
 /* Drag handle */
@@ -170,7 +388,7 @@
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
-  padding: 0.5rem 0.25rem;
+  padding: 0.25rem;
   z-index: 10;
 }
 
@@ -250,4 +468,22 @@
 
 .list-item.is-dragging {
   opacity: 0.5;
+}
+
+/* Remove extra depth styles */
+.ProseMirror .sub-list-item.depth-2,
+.ProseMirror .sub-list-item.depth-3 {
+  margin-left: 2rem; /* Keep same margin as depth-1 */
+}
+
+/* Adjust drag handle position for nested items */
+.ProseMirror .list-item .list-item .drag-handle {
+  left: 0.5rem;
+}
+
+/* Sub-list item content */
+.ProseMirror .sub-list-item .sub-list-item-content {
+  flex: 1;
+  min-width: 0;
+  margin-left: 1rem;
 } 

@@ -44,6 +44,7 @@
     "@sentry/nextjs": "^7.x",
     "@tanstack/react-query": "^5.17.19",
     "@tanstack/react-virtual": "^3.11.2",
+    "@tiptap/extension-bubble-menu": "^2.11.5",
     "@tiptap/pm": "^2.11.3",
     "@tiptap/react": "^2.11.3",
     "@tiptap/starter-kit": "^2.11.3",

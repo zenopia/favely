@@ -345,13 +345,27 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                   Type or paste your items below.
                   Press Enter to add new items.
                 </p>
-                <TiptapEditor
-                  content={editorContent}
-                  onChange={setEditorContent}
-                  onListTypeChange={handleListTypeChange}
-                  defaultListType={defaultValues?.listType || 'ordered'}
-                  placeholder=""
-                  className="min-h-[200px]"
+                <FormField
+                  control={form.control}
+                  name="items"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <TiptapEditor
+                          content={editorContent}
+                          onChange={(content) => {
+                            setEditorContent(content);
+                            field.onChange(content);
+                          }}
+                          defaultListType={form.getValues("listType")}
+                          onListTypeChange={(type) => form.setValue("listType", type)}
+                          category={form.getValues("category")}
+                          placeholder="Start your list..."
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
             </div>
