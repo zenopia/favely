@@ -1,0 +1,23 @@
+import { Editor } from '@tiptap/react'
+
+export type ListType = 'ordered' | 'bullet' | 'task'
+
+export interface TiptapEditorProps {
+  content?: string
+  onChange?: (content: string) => void
+  onListTypeChange?: (type: ListType) => void
+  defaultListType?: ListType
+  className?: string
+  editable?: boolean
+  placeholder?: string
+  category?: string
+}
+
+export interface EditorToolbarProps {
+  editor: Editor | null
+  currentListType: ListType
+  onListTypeChange: (type: ListType) => (e: React.MouseEvent) => void
+  handleIndent: (e: React.MouseEvent) => void
+  handleOutdent: (e: React.MouseEvent) => void
+  isListType: (type: ListType) => boolean
+} 

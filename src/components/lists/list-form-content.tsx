@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
-import type { ListType } from "@/components/editor/tiptap-editor";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
@@ -193,10 +192,6 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
     }
   };
 
-  const handleListTypeChange = (type: ListType) => {
-    form.setValue('listType', type)
-  }
-
   const handleDelete = async () => {
     if (!defaultValues?.id || !isSignedIn || !user?.username) return;
     
@@ -345,27 +340,15 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                   Type or paste your items below.
                   Press Enter to add new items.
                 </p>
-                <FormField
-                  control={form.control}
-                  name="items"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <TiptapEditor
-                          content={editorContent}
-                          onChange={(content) => {
-                            setEditorContent(content);
-                            field.onChange(content);
-                          }}
-                          defaultListType={form.getValues("listType")}
-                          onListTypeChange={(type) => form.setValue("listType", type)}
-                          category={form.getValues("category")}
-                          placeholder="Start your list..."
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                <TiptapEditor
+                  content={editorContent}
+                  onChange={(content) => {
+                    setEditorContent(content);
+                  }}
+                  defaultListType={form.getValues("listType")}
+                  onListTypeChange={(type) => form.setValue("listType", type)}
+                  category={form.getValues("category")}
+                  placeholder="Start your list..."
                 />
               </div>
             </div>

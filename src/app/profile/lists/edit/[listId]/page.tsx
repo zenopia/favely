@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { AuthService } from "@/lib/services/auth.service";
 import { ListFormContent } from "@/components/lists/list-form-content";
 import { ProtectedPageWrapper } from "@/components/auth/protected-page-wrapper";
 import { getList } from "@/lib/actions/list";
