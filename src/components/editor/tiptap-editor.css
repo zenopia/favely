@@ -288,6 +288,7 @@
 .ProseMirror li > ol {
   margin: 0.2rem 0;
   padding-left: 1rem !important;
+  width: 100%;
 }
 
 /* Adjust spacing for nested items */
@@ -447,7 +448,7 @@
   position: relative;
   margin: 0.2rem 0;
   padding: 0.5rem;
-  padding-left: 6rem; /* Match the padding of sub-list items */
+  padding-left: 2.5rem;
   border-radius: 0.5rem;
   cursor: pointer;
   background-color: rgba(255, 0, 0, 0.1) !important;
@@ -455,15 +456,32 @@
   transition: all 0.2s ease;
   min-height: 2.5rem;
   display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
-  margin-left: 2rem; /* Indentation for sub-list items */
+  gap: 0.5rem;
+  width: 100%;
+  margin-left: 0;
+}
+
+/* Sub-list item content wrapper */
+.ProseMirror ul li ul li > div,
+.ProseMirror ol li ol li > div,
+.ProseMirror ul li ol li > div,
+.ProseMirror ol li ul li > div {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
 }
 
 /* Sub-list item content */
-.ProseMirror ul li ul li > .list-item-content,
-.ProseMirror ol li ol li > .list-item-content,
-.ProseMirror ul li ol li > .list-item-content,
-.ProseMirror ol li ul li > .list-item-content {
+.ProseMirror ul li ul li > div > .list-item-content,
+.ProseMirror ol li ol li > div > .list-item-content,
+.ProseMirror ul li ol li > div > .list-item-content,
+.ProseMirror ol li ul li > div > .list-item-content {
   flex: 1;
   min-width: 0;
   position: relative;
@@ -496,7 +514,7 @@
   max-width: max-content;
   font-size: 0.875rem;
   white-space: nowrap;
-  margin-right: 0.4rem;
+  order: -1; /* Ensure tag comes before content */
 }
 
 /* Deeper nested levels */

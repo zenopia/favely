@@ -85,7 +85,8 @@ export const ListItemExtension = Node.create({
 
   group: 'listItem',
 
-  content: 'paragraph block*',
+  // Update content to wrap text in paragraph nodes
+  content: '(paragraph | bulletList | orderedList)*',
 
   defining: true,
 
@@ -258,6 +259,49 @@ export const ListItemExtension = Node.create({
     }
 
     return [
+      // Plugin to track selection changes and update active state
+      new Plugin({
+        appendTransaction: (transactions, oldState, newState) => {
+          // Only proceed if the selection has changed
+          if (oldState.selection.eq(newState.selection)) return null
+
+          const tr = newState.tr
+
+          // Clear active state from all list items
+          newState.doc.descendants((node, pos) => {
+            if (node.type.name === 'listItem') {
+              tr.setNodeMarkup(pos, undefined, { ...node.attrs, active: false })
+            }
+          })
+
+          // Find the list item that contains the current selection
+          const $from = newState.selection.$from
+          let depth = $from.depth
+          let listItemPos = null
+
+          // Walk up the tree to find the closest list item
+          while (depth > 0) {
+            const node = $from.node(depth)
+            if (node.type.name === 'listItem') {
+              listItemPos = $from.before(depth)
+              break
+            }
+            depth--
+          }
+
+          // Set active state for the selected item
+          if (listItemPos !== null) {
+            const node = newState.doc.nodeAt(listItemPos)
+            if (node) {
+              tr.setNodeMarkup(listItemPos, undefined, { ...node.attrs, active: true })
+              extension.storage.activeItemPos = listItemPos
+            }
+          }
+
+          return tr
+        }
+      }),
+
       // Plugin to disable ProseMirror's default drag behavior
       new Plugin({
         props: {
@@ -314,21 +358,31 @@ export const ListItemExtension = Node.create({
 
             if (activeItemPos === null) return false
 
+            // Get the source item's depth/level
+            const $sourcePos = state.doc.resolve(activeItemPos)
+            const sourceDepth = $sourcePos.depth
+            const sourceNode = state.doc.nodeAt(activeItemPos)
+            if (!sourceNode) return false
+
             // Get coordinates relative to the editor
             const editorRect = view.dom.getBoundingClientRect()
             const relativeY = event.clientY - editorRect.top
 
-            // Find all list items and their positions
+            // Find all list items and their positions at the same depth
             const listItems: { node: ProseMirrorNode, pos: number, rect?: DOMRect }[] = []
             state.doc.descendants((node, pos) => {
               if (node.type.name === 'listItem') {
-                const el = view.nodeDOM(pos) as HTMLElement
-                if (el instanceof HTMLElement) {
-                  listItems.push({ 
-                    node, 
-                    pos,
-                    rect: el.getBoundingClientRect()
-                  })
+                const $pos = state.doc.resolve(pos)
+                // Only include items at the same depth as the source item
+                if ($pos.depth === sourceDepth) {
+                  const el = view.nodeDOM(pos) as HTMLElement
+                  if (el instanceof HTMLElement) {
+                    listItems.push({ 
+                      node, 
+                      pos,
+                      rect: el.getBoundingClientRect()
+                    })
+                  }
                 }
               }
             })
@@ -348,10 +402,31 @@ export const ListItemExtension = Node.create({
             // Handle dropping at the end of the list
             const lastItem = listItems[listItems.length - 1]
             const lastItemBottom = lastItem.rect ? lastItem.rect.bottom - editorRect.top : 0
+            // Add a generous buffer zone below the last item (100px)
+            const dropBuffer = 100
 
-            if (relativeY > lastItemBottom) {
-              targetPos = lastItem.pos
-              insertAfter = true
+            if (relativeY > lastItemBottom - dropBuffer) {
+              // Find the parent list of the last item
+              const $lastPos = state.doc.resolve(lastItem.pos)
+              const parentDepth = $lastPos.depth - 1
+              
+              // Only allow dropping if we're at the same depth
+              if ($lastPos.depth === sourceDepth) {
+                // Set target to the last item's position
+                targetPos = lastItem.pos
+                insertAfter = true
+                
+                // Get the parent list end position
+                const parentEnd = $lastPos.end(parentDepth)
+                const lastNode = state.doc.nodeAt(lastItem.pos)
+                
+                // Calculate the position after the last item
+                if (lastNode) {
+                  targetPos = Math.min(parentEnd - 1, lastItem.pos + lastNode.nodeSize)
+                }
+              } else {
+                return false
+              }
             } else {
               // Find which item we're closest to vertically
               for (let i = 0; i < listItems.length; i++) {
@@ -360,29 +435,20 @@ export const ListItemExtension = Node.create({
 
                 const itemMiddleY = item.rect.top + (item.rect.height / 2) - editorRect.top
 
-                if (i === listItems.length - 1 && relativeY > itemMiddleY) {
+                if (i === listItems.length - 1 && relativeY > itemMiddleY - dropBuffer) {
                   targetPos = item.pos
                   insertAfter = true
                   break
                 }
-
-                const nextItem = listItems[i + 1]
-                if (!nextItem || !nextItem.rect) {
-                  if (relativeY <= itemMiddleY) {
-                    targetPos = item.pos
-                    insertAfter = false
-                    break
-                  }
-                  continue
-                }
-
-                const nextItemMiddleY = nextItem.rect.top + (nextItem.rect.height / 2) - editorRect.top
 
                 if (relativeY <= itemMiddleY) {
                   targetPos = item.pos
                   insertAfter = false
                   break
-                } else if (relativeY <= nextItemMiddleY) {
+                }
+
+                const nextItem = listItems[i + 1]
+                if (!nextItem || !nextItem.rect) {
                   targetPos = item.pos
                   insertAfter = true
                   break
@@ -390,28 +456,56 @@ export const ListItemExtension = Node.create({
               }
             }
 
+            // Verify target position is at the same depth
+            const $targetPos = state.doc.resolve(targetPos)
+            if ($targetPos.depth !== sourceDepth) {
+              return false
+            }
+
             if (targetPos === activeItemPos) return false
 
             const tr = state.tr
-            const sourceNode = state.doc.nodeAt(activeItemPos)
-            if (!sourceNode) return false
+            
+            // Get the full size of the source node including children
+            const sourceNodeSize = sourceNode.nodeSize
+            const sourceNodeEnd = activeItemPos + sourceNodeSize
+
+            // Calculate the insert position before deleting the source node
+            let insertPos
+            if (insertAfter) {
+              // When inserting after, ensure we stay within the parent list
+              const parentDepth = $targetPos.depth - 1
+              const parentNode = $targetPos.node(parentDepth)
+              const targetNode = $targetPos.nodeAfter
+              
+              if (parentNode && (parentNode.type.name === 'bulletList' || parentNode.type.name === 'orderedList')) {
+                // For the last position, use the parent list end position
+                if (relativeY > lastItemBottom - dropBuffer) {
+                  insertPos = $targetPos.end(parentDepth) - 1
+                } else if (targetNode) {
+                  insertPos = $targetPos.pos + targetNode.nodeSize
+                } else {
+                  insertPos = $targetPos.end(parentDepth) - 1
+                }
+              } else {
+                insertPos = targetPos
+              }
+            } else {
+              insertPos = targetPos
+            }
 
             // Delete the node from its current position
-            tr.delete(activeItemPos, activeItemPos + sourceNode.nodeSize)
+            tr.delete(activeItemPos, sourceNodeEnd)
             
-            // Adjust target position if needed
-            if (targetPos > activeItemPos) {
-              targetPos -= sourceNode.nodeSize
+            // Adjust insert position if it was after the deleted node
+            if (insertPos > activeItemPos) {
+              insertPos -= sourceNodeSize
             }
             
-            // Calculate final insert position
-            let insertPos = targetPos
-            if (insertAfter) {
-              const targetNode = state.doc.nodeAt(targetPos)
-              if (targetNode) {
-                insertPos += targetNode.nodeSize
-              }
-            }
+            // Final bounds check and ensure we're within the parent list
+            const $insertPos = state.doc.resolve(insertPos)
+            const parentEnd = $insertPos.end($insertPos.depth - 1)
+            insertPos = Math.max(0, Math.min(insertPos, parentEnd))
             
             // Insert the node at the new position
             tr.insert(insertPos, sourceNode)
