@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { AuthService } from "@/lib/services/auth.service";
 import { ProfilePage } from "@/components/profile/profile-page";
 import { AuthServerService } from "@/lib/services/auth.server";
 
