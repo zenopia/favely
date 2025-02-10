@@ -39,7 +39,7 @@ export interface ListItem {
   properties?: Array<{
     id: string;
     type?: 'text' | 'link';
-    label: string;
+    tag?: string;
     value: string;
   }>;
 }
@@ -94,7 +94,7 @@ export interface ItemDetails {
   properties?: Array<{
     id?: string;
     type?: 'text' | 'link';
-    label: string;
+    tag?: string;
     value: string;
   }>;
 }

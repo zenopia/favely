@@ -122,7 +122,10 @@ export const ListItemExtension = Node.create({
       },
       tag: {
         default: null,
-        parseHTML: element => element.getAttribute('data-tag'),
+        parseHTML: element => {
+          const tag = element.getAttribute('data-tag');
+          return tag === '' ? null : tag;
+        },
         renderHTML: attributes => {
           if (!attributes.tag) {
             return {}
@@ -147,6 +150,17 @@ export const ListItemExtension = Node.create({
     return [
       {
         tag: 'li',
+        getAttrs: element => {
+          if (typeof element === 'string') return {};
+          
+          const tag = element.getAttribute('data-tag');
+          const category = element.getAttribute('data-category');
+          
+          return {
+            tag: tag || null,
+            category: category || null,
+          };
+        },
       },
     ]
   },

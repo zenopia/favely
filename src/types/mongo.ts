@@ -5,45 +5,44 @@ export interface MongoListDocument {
   _id: Types.ObjectId;
   title: string;
   description?: string;
-  category: ListCategory;
+  category: string;
   privacy: 'public' | 'private';
-  listType?: ListType;
+  listType: 'ordered' | 'bullet';
   owner: {
     userId: Types.ObjectId;
     clerkId: string;
     username: string;
     joinedAt: Date;
   };
-  collaborators: Array<{
-    userId: Types.ObjectId;
-    clerkId: string;
-    username: string;
-    displayName: string;
-    imageUrl?: string;
-    role: 'viewer' | 'editor' | 'admin';
+  collaborators?: Array<{
+    userId?: Types.ObjectId;
+    clerkId?: string;
+    username?: string;
+    email?: string;
+    role: 'admin' | 'editor' | 'viewer';
     status: 'pending' | 'accepted' | 'rejected';
     invitedAt: Date;
     acceptedAt?: Date;
   }>;
-  items: Array<{
+  items?: Array<{
     title: string;
-    rank: number;
     comment?: string;
+    completed?: boolean;
+    rank?: number;
     properties?: Array<{
       type?: string;
-      label: string;
+      tag?: string;
       value: string;
     }>;
   }>;
-  stats: {
+  stats?: {
     viewCount: number;
     pinCount: number;
     copyCount: number;
   };
-  lastEditedAt?: Date;
-  editedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  editedAt?: Date;
 }
 
 export interface MongoUserDocument {

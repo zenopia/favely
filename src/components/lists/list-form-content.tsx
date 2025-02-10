@@ -48,7 +48,7 @@ export interface ListFormProps {
       properties?: Array<{
         id: string;
         type?: 'text' | 'link';
-        label: string;
+        tag?: string;
         value: string;
       }>;
     }>;
@@ -100,13 +100,14 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         .map(item => {
           // Create child items HTML for the properties
           const childItemsHtml = item.properties?.length 
-            ? `<${listTag}>${item.properties.map(prop => 
-                `<li data-tag="${prop.label}"><p>${prop.value}</p></li>`
-              ).join('')}</${listTag}>`
+            ? `<${listTag}>${item.properties.map(prop => {
+                const tagAttr = prop.tag ? ` data-tag="${prop.tag}"` : '';
+                return `<li data-type="listItem"${tagAttr} data-category="${defaultValues.category}"><p>${prop.value}</p></li>`;
+              }).join('')}</${listTag}>`
             : '';
 
           // Return parent item with its children nested inside
-          return `<li><p>${item.title}</p>${childItemsHtml}</li>`;
+          return `<li data-type="listItem"><p>${item.title}</p>${childItemsHtml}</li>`;
         })
         .join('');
 
@@ -157,29 +158,29 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
             .join('')
             .trim();
 
+          // Get all child items (properties) for this parent
+          const childList = item.querySelector('ul, ol');
+          
+          const properties = childList ? Array.from(childList.querySelectorAll(':scope > li')).map(childItem => {
+            const tag = childItem.getAttribute('data-tag');
+            const value = Array.from(childItem.childNodes)
+              .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
+              .map(node => node.textContent)
+              .join('')
+              .trim();
+
+            return {
+              tag: tag || undefined,
+              value
+            };
+          }) : [];
+
+          // Only add parent items to the list
           acc.push({
             title: textContent,
             completed: false,
-            properties: []
+            properties: properties
           });
-        } else {
-          // This is a child item - add it as a property to the last parent item
-          const tag = item.getAttribute('data-tag');
-          const textContent = Array.from(item.childNodes)
-            .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
-            .map(node => node.textContent)
-            .join('')
-            .trim();
-
-          if (acc.length > 0 && tag) {
-            const lastParent = acc[acc.length - 1];
-            lastParent.properties = lastParent.properties || [];
-            lastParent.properties.push({
-              type: 'text',
-              label: tag,
-              value: textContent
-            });
-          }
         }
         
         return acc;
@@ -187,8 +188,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         title: string;
         completed: boolean;
         properties: Array<{
-          type: 'text' | 'link';
-          label: string;
+          tag?: string;
           value: string;
         }>;
       }>);

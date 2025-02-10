@@ -8,9 +8,9 @@ import { AuthServerService } from "@/lib/services/auth.server";
 interface ListItem {
   title: string;
   comment?: string;
+  completed?: boolean;
   properties?: Array<{
-    type?: string;
-    label: string;
+    tag?: string;
     value: string;
   }>;
 }
@@ -143,12 +143,10 @@ export async function PUT(
     // Process items to ensure they have valid structure
     const processedItems = items.map((item: ListItem, index: number) => ({
       title: item.title,
-      rank: index + 1,
-      comment: item.comment,
+      completed: item.completed || false,
       properties: (item.properties || []).map(prop => ({
-        type: prop.type || 'text',
-        label: prop.label || '',
-        value: prop.value || ''
+        tag: prop.tag,
+        value: prop.value
       }))
     }));
 

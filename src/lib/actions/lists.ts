@@ -179,7 +179,7 @@ export async function getEnhancedLists(
         properties: item.properties?.map(prop => ({
           id: crypto.randomUUID(),
           type: prop.type as 'text' | 'link',
-          label: prop.label,
+          tag: prop.tag,
           value: prop.value
         }))
       } as ListItem)) || [],

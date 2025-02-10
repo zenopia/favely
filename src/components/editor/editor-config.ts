@@ -12,12 +12,12 @@ export const createEditorExtensions = (category: string | undefined) => [
     codeBlock: false,
     orderedList: {
       keepMarks: true,
-      keepAttributes: false,
+      keepAttributes: true,
       itemTypeName: 'listItem',
     },
     bulletList: {
       keepMarks: true,
-      keepAttributes: false,
+      keepAttributes: true,
       itemTypeName: 'listItem',
     },
     listItem: false,

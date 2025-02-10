@@ -4,7 +4,7 @@ import type { ListCategory, ListPrivacy } from '@/types/list';
 export const itemPropertySchema = z.object({
   id: z.string().optional(),
   type: z.enum(['text', 'link']),
-  label: z.string().min(1, 'Label is required').max(50, 'Label is too long'),
+  tag: z.string().min(1, 'Tag is required').max(50, 'Tag is too long').optional(),
   value: z.string().min(1, 'Value is required').max(500, 'Value is too long')
 });
 

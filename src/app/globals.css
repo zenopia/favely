@@ -134,6 +134,16 @@
   .fab-button {
     @apply bg-primary/70 hover:bg-primary/90 transition-colors;
   }
+
+  /* Ensure FAB container doesn't affect positioning */
+  .fab-section {
+    position: static !important;
+    pointer-events: none;
+  }
+  
+  .fab-section > * {
+    pointer-events: auto;
+  }
 }
 
 @layer components {

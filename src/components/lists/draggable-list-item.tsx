@@ -15,7 +15,7 @@ interface DraggableListItemProps {
     properties?: Array<{
       id: string;
       type?: 'text' | 'link';
-      label: string;
+      tag?: string;
       value: string;
     }>;
   };
@@ -27,7 +27,7 @@ interface DraggableListItemProps {
     properties?: Array<{
       id: string;
       type?: 'text' | 'link';
-      label: string;
+      tag?: string;
       value: string;
     }>;
   }>) => void;

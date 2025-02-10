@@ -18,7 +18,7 @@ interface ItemDetailsOverlayProps {
 interface ItemProperty {
   id?: string;
   type?: 'text' | 'link';
-  label: string;
+  tag?: string;
   value: string;
 }
 
@@ -44,7 +44,7 @@ export function ItemDetailsOverlay({
       ...details,
       properties: [
         ...(details.properties || []),
-        { id: crypto.randomUUID(), type: 'text', label: '', value: '' }
+        { id: crypto.randomUUID(), type: 'text', tag: '', value: '' }
       ]
     });
   };
@@ -111,9 +111,9 @@ export function ItemDetailsOverlay({
                   </Select>
 
                   <Input
-                    placeholder="Label"
-                    value={property.label}
-                    onChange={(e) => handlePropertyChange(index, 'label', e.target.value)}
+                    placeholder="Tag"
+                    value={property.tag}
+                    onChange={(e) => handlePropertyChange(index, 'tag', e.target.value)}
                   />
 
                   <Button
