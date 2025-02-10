@@ -12,6 +12,9 @@
   border: 1px solid #e2e8f0;
   min-height: 150px;
   outline: none;
+  margin-bottom: 4rem; /* Add margin to prevent overlap with sticky bar */
+  position: relative;
+  z-index: 1; /* Ensure editor is below sticky elements */
 }
 
 .ProseMirror > * + * {
@@ -375,6 +378,18 @@
   cursor: move;
 }
 
+/* Ensure tag button remains visible during dragging */
+.ProseMirror .list-item.is-dragging .tag-button {
+  opacity: 1 !important;
+  display: inline-flex !important;
+}
+
+.ProseMirror .list-item.is-dragging .tag-button.has-tag {
+  background-color: #e2e8f0;
+  color: #475569;
+  border-color: transparent;
+}
+
 /* Drop target indicator */
 .ProseMirror .drop-target {
   position: relative;
@@ -523,4 +538,12 @@
 .ProseMirror ul li ol li ul li,
 .ProseMirror ol li ul li ol li {
   background-color: rgba(188, 2, 255, 0.15) !important;
+}
+
+/* Ensure sticky elements stay on top */
+.sticky, 
+.fixed,
+[data-sticky="true"] {
+  position: sticky !important;
+  z-index: 10 !important;
 }

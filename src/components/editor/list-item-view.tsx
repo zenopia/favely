@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { NodeViewWrapper, NodeViewContent, Editor, Extension, NodeViewProps } from '@tiptap/react'
 import { createPortal } from 'react-dom'
 import { ListItemAttributes } from './list-item-extension'
@@ -27,6 +27,7 @@ export default function ListItemView({
   const ref = useRef<HTMLDivElement>(null)
   const dragHandleRef = useRef<HTMLDivElement>(null)
   const tagButtonRef = useRef<HTMLDivElement>(null)
+  const draggedTagRef = useRef<string | null>(null)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const categoryRef = useRef(category)
@@ -36,25 +37,32 @@ export default function ListItemView({
     const usedTags = new Set<string>()
     const pos = getPos()
     
-    // Find the parent list item
-    let parentPos = pos
-    let depth = editor.state.doc.resolve(pos).depth
-    while (depth > 1) {
-      parentPos = editor.state.doc.resolve(pos).before(depth)
-      depth--
-    }
+    try {
+      // Find the parent list item
+      let parentPos = pos
+      let depth = editor.state.doc.resolve(pos).depth
+      while (depth > 1) {
+        parentPos = editor.state.doc.resolve(pos).before(depth)
+        depth--
+      }
 
-    // Get all child list items and their tags
-    const parentNode = editor.state.doc.nodeAt(parentPos)
-    if (parentNode) {
-      parentNode.descendants((node, _, parent) => {
-        if (node.type.name === 'listItem' && parent && parent !== parentNode) {
-          const nodeTag = node.attrs.tag
-          if (nodeTag) {
-            usedTags.add(nodeTag)
+      // Get all child list items and their tags
+      const parentNode = editor.state.doc.nodeAt(parentPos)
+      if (parentNode) {
+        // Get the parent's category
+        const parentCategory = parentNode.attrs.category
+        
+        parentNode.descendants((node, _, parent) => {
+          if (node.type.name === 'listItem' && parent && parent !== parentNode) {
+            const nodeTag = node.attrs.tag
+            if (nodeTag) {
+              usedTags.add(nodeTag)
+            }
           }
-        }
-      })
+        })
+      }
+    } catch (error) {
+      console.error('Error getting used tags:', error)
     }
 
     return usedTags
@@ -62,38 +70,71 @@ export default function ListItemView({
 
   // Memoize available tags to prevent unnecessary recalculations
   const availableTags = useMemo(() => {
-    if (!category || category === categoryRef.current) {
-      categoryRef.current = category
-      const allTags = categoryRef.current && categoryRef.current in categoryTags 
-        ? categoryTags[categoryRef.current as keyof typeof categoryTags] 
+    try {
+      // Get the parent's category
+      const pos = getPos()
+      const $pos = editor.state.doc.resolve(pos)
+      let parentPos = pos
+      let depth = $pos.depth
+      let parentCategory = category
+
+      // Find the parent list item and its category
+      while (depth > 1) {
+        parentPos = $pos.before(depth)
+        const parentNode = editor.state.doc.nodeAt(parentPos)
+        if (parentNode && parentNode.attrs.category) {
+          parentCategory = parentNode.attrs.category
+          break
+        }
+        depth--
+      }
+
+      // Use the parent's category to get available tags
+      const allTags = parentCategory && parentCategory in categoryTags 
+        ? categoryTags[parentCategory as keyof typeof categoryTags] 
         : []
       
       // For parent list items, return empty array (no tags allowed)
-      const pos = getPos()
-      const depth = editor.state.doc.resolve(pos).depth
-      if (depth <= 1) {
+      if ($pos.depth <= 1) {
         return []
       }
 
       // For child list items, filter out used tags
       const usedTags = getUsedTags()
       return allTags.filter(tag => !usedTags.has(tag) || node.attrs.tag === tag)
-    }
-    
-    categoryRef.current = category
-    const allTags = category in categoryTags ? categoryTags[category as keyof typeof categoryTags] : []
-    
-    // For parent list items, return empty array
-    const pos = getPos()
-    const depth = editor.state.doc.resolve(pos).depth
-    if (depth <= 1) {
+    } catch (error) {
+      console.error('Error calculating available tags:', error)
       return []
     }
+  }, [category, editor.state.doc, getPos, node.attrs.tag, editor.state.selection])
 
-    // For child list items, filter out used tags
-    const usedTags = getUsedTags()
-    return allTags.filter(tag => !usedTags.has(tag) || node.attrs.tag === tag)
-  }, [category, editor.state.doc, getPos, node.attrs.tag])
+  // Add a function to refresh available tags and ensure category is preserved
+  const refreshAvailableTags = useCallback(() => {
+    const pos = getPos()
+    const $pos = editor.state.doc.resolve(pos)
+    let parentPos = pos
+    let depth = $pos.depth
+    let parentCategory = category
+
+    // Find the parent list item and its category
+    while (depth > 1) {
+      parentPos = $pos.before(depth)
+      const parentNode = editor.state.doc.nodeAt(parentPos)
+      if (parentNode && parentNode.attrs.category) {
+        parentCategory = parentNode.attrs.category
+        break
+      }
+      depth--
+    }
+
+    editor.commands.command(({ tr }) => {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        category: parentCategory // Ensure category is preserved
+      })
+      return true
+    })
+  }, [editor, getPos, node.attrs, category])
 
   const handleClick = (event: React.MouseEvent) => {
     event.stopPropagation()
@@ -122,9 +163,13 @@ export default function ListItemView({
     })
   }
 
+  // Handle tag click with refresh
   const handleTagClick = (event: React.MouseEvent) => {
     event.preventDefault()
     event.stopPropagation()
+    
+    // Refresh available tags before showing menu
+    refreshAvailableTags()
     
     if (tagButtonRef.current) {
       const rect = tagButtonRef.current.getBoundingClientRect()
@@ -167,15 +212,31 @@ export default function ListItemView({
     }
   }, [showTagMenu])
 
-  console.log('Category:', category);
-  console.log('Available Tags:', availableTags);
-
   const handleDragStart = (event: React.DragEvent) => {
     event.stopPropagation()
     const pos = getPos()
+    
+    // Store the tag in both the ref and the extension storage
+    draggedTagRef.current = tag || null
+    editor.storage.listItem.draggedTag = tag || null
+    
+    console.log('Drag start - Current tag:', tag)
+    console.log('Drag start - Stored in ref:', draggedTagRef.current)
+    console.log('Drag start - Stored in extension:', editor.storage.listItem.draggedTag)
+    
     editor.commands.setListItemActive(pos)
+    editor.commands.command(({ tr }) => {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        dragging: true,
+        active: true
+      })
+      return true
+    })
+    
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', '')
+    event.dataTransfer.setData('application/tag', tag || '')
   }
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -209,6 +270,14 @@ export default function ListItemView({
   const handleDragEnd = (event: React.DragEvent) => {
     event.preventDefault()
     event.stopPropagation()
+    const pos = getPos()
+    editor.commands.command(({ tr }) => {
+      tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        dragging: false
+      })
+      return true
+    })
     document.querySelectorAll('.drop-target').forEach(el => {
       el.classList.remove('drop-target', 'drop-target-top', 'drop-target-bottom')
     })
@@ -217,6 +286,9 @@ export default function ListItemView({
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault()
     event.stopPropagation()
+    
+    // Close the tag menu if it's open
+    setShowTagMenu(false)
     
     // Create a synthetic drop event for ProseMirror
     const dropEvent = new DragEvent('drop', {
@@ -300,6 +372,24 @@ export default function ListItemView({
     }
   }, [editor.commands, editor.view.dom, getPos])
 
+  // Add a useEffect to update tag menu position when the list item moves
+  useEffect(() => {
+    if (showTagMenu && tagButtonRef.current) {
+      const rect = tagButtonRef.current.getBoundingClientRect()
+      setMenuPosition({
+        top: rect.bottom + window.scrollY,
+        left: rect.left + window.scrollX
+      })
+    }
+  }, [showTagMenu, getPos()])
+
+  // Modify the refresh effect to only handle tag availability
+  useEffect(() => {
+    if (!dragging) {
+      refreshAvailableTags()
+    }
+  }, [dragging, refreshAvailableTags])
+
   return (
     <>
       <NodeViewWrapper 
@@ -333,7 +423,7 @@ export default function ListItemView({
           contentEditable={false} 
           onClick={handleTagClick}
         >
-          {tag ? tag : <Tag className="h-4 w-4" />}
+          {tag ? <span key={tag}>{tag}</span> : <Tag className="h-4 w-4" />}
         </div>
 
         <NodeViewContent className="list-item-content" />
