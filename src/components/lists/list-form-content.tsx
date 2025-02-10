@@ -97,8 +97,19 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       // Convert existing items to HTML list with correct list type
       const listTag = defaultValues.listType === 'bullet' ? 'ul' : 'ol';
       const itemsHtml = defaultValues.items
-        .map(item => `<li><p>${item.title}</p></li>`)
+        .map(item => {
+          // Create child items HTML for the properties
+          const childItemsHtml = item.properties?.length 
+            ? `<${listTag}>${item.properties.map(prop => 
+                `<li data-tag="${prop.label}"><p>${prop.value}</p></li>`
+              ).join('')}</${listTag}>`
+            : '';
+
+          // Return parent item with its children nested inside
+          return `<li><p>${item.title}</p>${childItemsHtml}</li>`;
+        })
         .join('');
+
       return `<${listTag}>${itemsHtml}</${listTag}>`;
     }
     return '';
@@ -134,16 +145,61 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
     setIsSubmitting(true);
 
     try {
+      // Process list items to include tags for child items
+      const processedItems = listItems.reduce((acc, item) => {
+        const isChildItem = item.parentElement?.parentElement?.tagName.toLowerCase() === 'li';
+        
+        if (!isChildItem) {
+          // This is a parent item
+          const textContent = Array.from(item.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
+            .map(node => node.textContent)
+            .join('')
+            .trim();
+
+          acc.push({
+            title: textContent,
+            completed: false,
+            properties: []
+          });
+        } else {
+          // This is a child item - add it as a property to the last parent item
+          const tag = item.getAttribute('data-tag');
+          const textContent = Array.from(item.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
+            .map(node => node.textContent)
+            .join('')
+            .trim();
+
+          if (acc.length > 0 && tag) {
+            const lastParent = acc[acc.length - 1];
+            lastParent.properties = lastParent.properties || [];
+            lastParent.properties.push({
+              type: 'text',
+              label: tag,
+              value: textContent
+            });
+          }
+        }
+        
+        return acc;
+      }, [] as Array<{
+        title: string;
+        completed: boolean;
+        properties: Array<{
+          type: 'text' | 'link';
+          label: string;
+          value: string;
+        }>;
+      }>);
+
       const payload = {
         title: data.title,
         category: data.category,
         description: data.description,
         privacy: data.privacy,
         listType: data.listType,
-        items: listItems.map(item => ({
-          title: item.textContent || '',
-          completed: false,
-        }))
+        items: processedItems
       };
 
       const response = await fetch(
@@ -175,7 +231,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         router.push(returnPath);
       } else {
         const listPath = mode === 'create' 
-          ? `/${user.username}/lists/${responseData.id}`
+          ? `/lists/${responseData.id}`
           : `/${user.username}/lists/${defaultValues?.id}`;
         router.push(listPath);
       }

@@ -48,16 +48,9 @@ export const initializeEditorContent = (editor: Editor, content: string | undefi
       .focus()
       .run()
   } else {
-    const tempDiv = document.createElement('div')
-    tempDiv.innerHTML = content
-    const items = Array.from(tempDiv.querySelectorAll('li'))
-    const itemsHtml = items
-      .map(item => `<li>${item.textContent || placeholder}</li>`)
-      .join('')
-    
     editor
       .chain()
-      .setContent(`<ol>${itemsHtml}</ol>`)
+      .setContent(content)
       .run()
   }
 

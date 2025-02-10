@@ -31,16 +31,69 @@ export default function ListItemView({
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const categoryRef = useRef(category)
 
+  // Get all used tags in the current child list
+  const getUsedTags = () => {
+    const usedTags = new Set<string>()
+    const pos = getPos()
+    
+    // Find the parent list item
+    let parentPos = pos
+    let depth = editor.state.doc.resolve(pos).depth
+    while (depth > 1) {
+      parentPos = editor.state.doc.resolve(pos).before(depth)
+      depth--
+    }
+
+    // Get all child list items and their tags
+    const parentNode = editor.state.doc.nodeAt(parentPos)
+    if (parentNode) {
+      parentNode.descendants((node, _, parent) => {
+        if (node.type.name === 'listItem' && parent && parent !== parentNode) {
+          const nodeTag = node.attrs.tag
+          if (nodeTag) {
+            usedTags.add(nodeTag)
+          }
+        }
+      })
+    }
+
+    return usedTags
+  }
+
   // Memoize available tags to prevent unnecessary recalculations
   const availableTags = useMemo(() => {
     if (!category || category === categoryRef.current) {
-      return categoryRef.current && categoryRef.current in categoryTags 
+      categoryRef.current = category
+      const allTags = categoryRef.current && categoryRef.current in categoryTags 
         ? categoryTags[categoryRef.current as keyof typeof categoryTags] 
         : []
+      
+      // For parent list items, return empty array (no tags allowed)
+      const pos = getPos()
+      const depth = editor.state.doc.resolve(pos).depth
+      if (depth <= 1) {
+        return []
+      }
+
+      // For child list items, filter out used tags
+      const usedTags = getUsedTags()
+      return allTags.filter(tag => !usedTags.has(tag) || node.attrs.tag === tag)
     }
+    
     categoryRef.current = category
-    return category in categoryTags ? categoryTags[category as keyof typeof categoryTags] : []
-  }, [category])
+    const allTags = category in categoryTags ? categoryTags[category as keyof typeof categoryTags] : []
+    
+    // For parent list items, return empty array
+    const pos = getPos()
+    const depth = editor.state.doc.resolve(pos).depth
+    if (depth <= 1) {
+      return []
+    }
+
+    // For child list items, filter out used tags
+    const usedTags = getUsedTags()
+    return allTags.filter(tag => !usedTags.has(tag) || node.attrs.tag === tag)
+  }, [category, editor.state.doc, getPos, node.attrs.tag])
 
   const handleClick = (event: React.MouseEvent) => {
     event.stopPropagation()

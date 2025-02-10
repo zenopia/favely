@@ -21,11 +21,8 @@ export interface ListCollaborator {
 interface ListItem {
   title: string;
   comment?: string;
-  properties?: Array<{
-    type: 'text' | 'link';
-    label: string;
-    value: string;
-  }>;
+  tag?: string;
+  completed: boolean;
 }
 
 export interface ListDocument extends Document {
@@ -70,11 +67,8 @@ const listSchema = new Schema<ListDocument>({
   items: [{
     title: { type: String, required: true },
     comment: { type: String },
-    properties: [{
-      type: { type: String, enum: ['text', 'link'], default: 'text' },
-      label: { type: String, required: true },
-      value: { type: String, required: true }
-    }]
+    tag: { type: String },
+    completed: { type: Boolean, default: false }
   }],
   stats: {
     viewCount: { type: Number, default: 0 },

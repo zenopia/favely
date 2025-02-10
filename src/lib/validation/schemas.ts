@@ -11,7 +11,8 @@ export const itemPropertySchema = z.object({
 export const listItemSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title is too long'),
   comment: z.string().max(1000, 'Comment is too long').optional(),
-  properties: z.array(itemPropertySchema).optional()
+  tag: z.string().max(50, 'Tag is too long').optional(),
+  completed: z.boolean().default(false)
 });
 
 export const listSchema = z.object({
