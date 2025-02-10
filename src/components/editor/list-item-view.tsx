@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
-import { NodeViewWrapper, NodeViewContent, Editor, Extension, NodeViewProps } from '@tiptap/react'
+import { NodeViewWrapper, NodeViewContent, Editor, Extension } from '@tiptap/react'
 import { createPortal } from 'react-dom'
 import { ListItemAttributes } from './list-item-extension'
 import categoryTags from '@/lib/tagMappings'
@@ -30,10 +30,9 @@ export default function ListItemView({
   const draggedTagRef = useRef<string | null>(null)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
-  const categoryRef = useRef(category)
 
   // Get all used tags in the current child list
-  const getUsedTags = () => {
+  const getUsedTags = useCallback(() => {
     const usedTags = new Set<string>()
     const pos = getPos()
     
@@ -49,9 +48,6 @@ export default function ListItemView({
       // Get all child list items and their tags
       const parentNode = editor.state.doc.nodeAt(parentPos)
       if (parentNode) {
-        // Get the parent's category
-        const parentCategory = parentNode.attrs.category
-        
         parentNode.descendants((node, _, parent) => {
           if (node.type.name === 'listItem' && parent && parent !== parentNode) {
             const nodeTag = node.attrs.tag
@@ -66,7 +62,7 @@ export default function ListItemView({
     }
 
     return usedTags
-  }
+  }, [editor.state.doc, getPos])
 
   // Memoize available tags to prevent unnecessary recalculations
   const availableTags = useMemo(() => {
@@ -106,7 +102,7 @@ export default function ListItemView({
       console.error('Error calculating available tags:', error)
       return []
     }
-  }, [category, editor.state.doc, getPos, node.attrs.tag, editor.state.selection])
+  }, [category, editor.state.doc, getPos, node.attrs.tag, getUsedTags])
 
   // Add a function to refresh available tags and ensure category is preserved
   const refreshAvailableTags = useCallback(() => {
@@ -216,10 +212,6 @@ export default function ListItemView({
     // Store the tag in both the ref and the extension storage
     draggedTagRef.current = tag || null
     editor.storage.listItem.draggedTag = tag || null
-    
-    console.log('Drag start - Current tag:', tag)
-    console.log('Drag start - Stored in ref:', draggedTagRef.current)
-    console.log('Drag start - Stored in extension:', editor.storage.listItem.draggedTag)
     
     editor.commands.setListItemActive(pos)
     editor.commands.command(({ tr }) => {
@@ -378,7 +370,7 @@ export default function ListItemView({
         left: rect.left + window.scrollX
       })
     }
-  }, [showTagMenu, getPos()])
+  }, [showTagMenu, getPos])
 
   // Modify the refresh effect to only handle tag availability
   useEffect(() => {

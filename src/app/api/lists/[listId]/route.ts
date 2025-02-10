@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { AuthService } from "@/lib/services/auth.service";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getListModel, ListDocument, ListCollaborator } from "@/lib/db/models-v2/list";
 import { getEnhancedLists } from "@/lib/actions/lists";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import { Types } from "mongoose";
 import { AuthServerService } from "@/lib/services/auth.server";
 
 interface ListItem {
@@ -15,19 +13,6 @@ interface ListItem {
     label: string;
     value: string;
   }>;
-}
-
-// Helper function to check if user has access to the list
-async function hasListAccess(list: ListDocument, userId: string | null) {
-  if (!userId) return list.privacy === 'public';
-  
-  return (
-    list.privacy === 'public' ||
-    list.owner.clerkId === userId ||
-    list.collaborators.some((c: ListCollaborator) => 
-      c.clerkId === userId && c.status === 'accepted'
-    )
-  );
 }
 
 // Helper function to check if user can edit the list
