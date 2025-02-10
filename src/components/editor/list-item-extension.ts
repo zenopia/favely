@@ -414,13 +414,15 @@ export const ListItemExtension = Node.create({
               // Handle dropping at the end of the list
               const lastItem = listItems[listItems.length - 1]
               const lastItemBottom = lastItem.rect ? lastItem.rect.bottom - editorRect.top : 0
-              const dropBuffer = 100
+              const dropBuffer = 20 // Reduced from 100 to make it less sensitive
 
               if (relativeY > lastItemBottom - dropBuffer) {
                 const $lastPos = state.doc.resolve(lastItem.pos)
                 const parentDepth = $lastPos.depth - 1
+                const parentNode = $lastPos.node(parentDepth)
                 
-                if ($lastPos.depth === sourceDepth) {
+                // Only allow dropping at the end if we're in the same parent list
+                if ($lastPos.depth === sourceDepth && parentNode.type.name === $sourcePos.node(sourceDepth - 1).type.name) {
                   targetPos = lastItem.pos
                   insertAfter = true
                   

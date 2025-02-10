@@ -5,11 +5,10 @@ import { EditorToolbarProps } from './types'
 
 export function EditorToolbar({
   editor,
-  currentListType,
   onListTypeChange,
+  isListType,
   handleIndent,
   handleOutdent,
-  isListType,
 }: EditorToolbarProps) {
   if (!editor) {
     return null

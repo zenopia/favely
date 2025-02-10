@@ -7,64 +7,14 @@ export const useListManagement = (editor: Editor | null, currentListType: ListTy
     e.preventDefault()
     if (!editor) return
     
-    const { state } = editor
-    const { selection } = state
-    const { $from } = selection
-    const pos = $from.before()
-    const node = state.doc.nodeAt(pos)
-    const parentList = $from.node(-2)
-    const isInList = parentList && (parentList.type.name === 'bulletList' || parentList.type.name === 'orderedList')
-    
-    if (!isInList || !node) return
-
-    // Check if we're already in a nested list
-    const grandParent = $from.node(-3)
-    const isInNestedList = grandParent && grandParent.type.name === 'listItem'
-    
-    if (isInNestedList) {
-      // Already nested, don't allow further nesting
-      return
-    }
-
-    if (node.type.name === 'listItem') {
-      // Convert directly to sub-list item
-      const tr = state.tr
-      const subListItem = state.schema.nodes.subListItem.create(
-        { 
-          category: node.attrs.category,
-          depth: 0
-        },
-        node.content
-      )
-
-      tr.replaceWith(pos, pos + node.nodeSize, subListItem)
-      editor.view.dispatch(tr)
-    }
+    editor.commands.sinkListItem()
   }, [editor])
 
   const handleOutdent = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     if (!editor) return
     
-    const { state } = editor
-    const { selection } = state
-    const { $from } = selection
-    const pos = $from.before()
-    const node = state.doc.nodeAt(pos)
-
-    if (node && node.type.name === 'subListItem') {
-      // Convert back to regular list item
-      const tr = state.tr
-      const listItem = state.schema.nodes.listItem.create(
-        {},
-        node.content
-      )
-
-      tr.replaceWith(pos, pos + node.nodeSize, listItem)
-      editor.view.dispatch(tr)
-    } else {
-      editor.commands.liftListItem()
-    }
+    editor.commands.liftListItem()
   }, [editor])
 
   const handleListTypeChange = useCallback((type: ListType) => (e: React.MouseEvent) => {

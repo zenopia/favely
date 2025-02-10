@@ -1,7 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import BubbleMenu from '@tiptap/extension-bubble-menu'
 import { ListItemExtension } from './list-item-extension'
-import { SubListItemExtension } from './sub-list-item-extension'
 import { Editor } from '@tiptap/react'
 import { ListType } from './types'
 
@@ -25,11 +24,6 @@ export const createEditorExtensions = (category: string | undefined) => [
   }),
   ListItemExtension.configure({
     nested: true,
-    HTMLAttributes: {
-      category,
-    },
-  }),
-  SubListItemExtension.configure({
     HTMLAttributes: {
       category,
     },

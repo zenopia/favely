@@ -15,9 +15,8 @@ export interface TiptapEditorProps {
 
 export interface EditorToolbarProps {
   editor: Editor | null
-  currentListType: ListType
   onListTypeChange: (type: ListType) => (e: React.MouseEvent) => void
+  isListType: (type: ListType) => boolean
   handleIndent: (e: React.MouseEvent) => void
   handleOutdent: (e: React.MouseEvent) => void
-  isListType: (type: ListType) => boolean
 } 

@@ -29,49 +29,13 @@ function TiptapEditorComponent({
   const handleKeyDown = (view: EditorView, event: KeyboardEvent): boolean => {
     if (!editor) return false
     
-    const { state } = view
-    const { selection } = state
-    const { $from } = selection
-    const pos = $from.before()
-    const node = state.doc.nodeAt(pos)
-
     if (event.key === 'Tab') {
       event.preventDefault()
       
       if (!event.shiftKey) {
-        const grandParent = $from.node(-3)
-        const isInNestedList = grandParent && grandParent.type.name === 'listItem'
-        
-        if (isInNestedList) return true
-
-        if (node && node.type.name === 'listItem') {
-          const tr = state.tr
-          const subListItem = state.schema.nodes.subListItem.create(
-            { 
-              category: initialCategoryRef.current,
-              depth: 0
-            },
-            node.content
-          )
-
-          tr.replaceWith(pos, pos + node.nodeSize, subListItem)
-          editor.view.dispatch(tr)
-          return true
-        }
+        return editor.commands.sinkListItem()
       } else {
-        if (node && node.type.name === 'subListItem') {
-          const tr = state.tr
-          const listItem = state.schema.nodes.listItem.create(
-            {},
-            node.content
-          )
-
-          tr.replaceWith(pos, pos + node.nodeSize, listItem)
-          editor.view.dispatch(tr)
-          return true
-        } else {
-          return editor.commands.liftListItem()
-        }
+        return editor.commands.liftListItem()
       }
     }
 
@@ -90,7 +54,7 @@ function TiptapEditorComponent({
       // Set initial category
       if (initialCategoryRef.current) {
         editor.state.doc.descendants((node, pos) => {
-          if (node.type.name === 'listItem' || node.type.name === 'subListItem') {
+          if (node.type.name === 'listItem') {
             editor.commands.command(({ tr }) => {
               tr.setNodeMarkup(pos, undefined, {
                 ...node.attrs,
@@ -123,7 +87,7 @@ function TiptapEditorComponent({
     if (editor && category !== initialCategoryRef.current) {
       initialCategoryRef.current = category
       editor.state.doc.descendants((node, pos) => {
-        if (node.type.name === 'listItem' || node.type.name === 'subListItem') {
+        if (node.type.name === 'listItem') {
           editor.commands.command(({ tr }) => {
             tr.setNodeMarkup(pos, undefined, {
               ...node.attrs,
@@ -137,10 +101,10 @@ function TiptapEditorComponent({
   }, [category, editor])
 
   const {
-    handleIndent,
-    handleOutdent,
     handleListTypeChange,
     isListType,
+    handleIndent,
+    handleOutdent,
   } = useListManagement(editor, currentListType, (type) => {
     setCurrentListType(type)
     if (onListTypeChange) {
@@ -156,11 +120,10 @@ function TiptapEditorComponent({
     <div className="flex flex-col gap-2">
       <EditorToolbar
         editor={editor}
-        currentListType={currentListType}
         onListTypeChange={handleListTypeChange}
+        isListType={isListType}
         handleIndent={handleIndent}
         handleOutdent={handleOutdent}
-        isListType={isListType}
       />
       <EditorContent editor={editor} />
     </div>

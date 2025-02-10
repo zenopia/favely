@@ -140,21 +140,18 @@ export default function ListItemView({
     event.stopPropagation()
     const pos = getPos()
     
-    // First, deactivate all list items
-    editor.state.doc.descendants((node, pos) => {
-      if (node.type.name === 'listItem') {
-        editor.commands.command(({ tr }) => {
+    editor.commands.command(({ tr }) => {
+      // First, deactivate all list items
+      tr.doc.descendants((node, pos) => {
+        if (node.type.name === 'listItem') {
           tr.setNodeMarkup(pos, undefined, {
             ...node.attrs,
             active: false
           })
-          return true
-        })
-      }
-    })
+        }
+      })
 
-    // Then activate only the clicked item
-    editor.commands.command(({ tr }) => {
+      // Then activate only the clicked item
       tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
         active: true
