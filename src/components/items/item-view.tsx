@@ -1,9 +1,7 @@
 'use client';
 
 import type { EnhancedList, ListItem } from "@/types/list";
-import { ItemCard } from "@/components/items/item-card";
-import { Link2, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Lock } from "lucide-react";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import { toast } from "sonner";
 import { ItemDetailsOverlay } from "@/components/items/item-details-overlay";
@@ -22,9 +20,9 @@ export function ItemView({
 }: ItemViewProps) {
   const [showDetails, setShowDetails] = useState(false);
 
-  const handleDetailsUpdate = async (details: { title: string; comment?: string; properties?: Array<{ type?: 'text' | 'link'; label: string; value: string; }> }) => {
+  const handleDetailsUpdate = async (details: { title: string; comment?: string; properties?: Array<{ type?: 'text' | 'link'; tag?: string; value: string; }> }) => {
     try {
-      const response = await fetch(`/api/${list.owner.username}/lists/${list.id}/items/${item.rank}`, {
+      const response = await fetch(`/api/${list.owner.username}/lists/${list.id}/items/${item.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +67,7 @@ export function ItemView({
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Item #{item.rank}</h2>
+            <h2 className="text-xl font-semibold">Item #{item.id}</h2>
             {isOwner && (
               <button
                 onClick={() => setShowDetails(true)}

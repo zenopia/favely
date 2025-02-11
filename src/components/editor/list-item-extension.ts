@@ -3,7 +3,6 @@ import { ReactNodeViewRenderer } from '@tiptap/react'
 import { Plugin } from 'prosemirror-state'
 import { splitListItem, liftListItem, sinkListItem } from '@tiptap/pm/schema-list'
 import { EditorView, DecorationSet } from 'prosemirror-view'
-import { TextSelection } from 'prosemirror-state'
 import ListItemView from './list-item-view'
 import { Slice, Node as ProseMirrorNode } from 'prosemirror-model'
 
@@ -276,7 +275,6 @@ export const ListItemExtension = Node.create({
         // Only allow lifting if we're not in the outermost list
         const { $from } = state.selection
         const grandParent = $from.node(-3)
-        const greatGrandParent = $from.node(-4)
         
         // If we're in a nested list (has listItem grandparent)
         if (grandParent && grandParent.type.name === 'listItem') {

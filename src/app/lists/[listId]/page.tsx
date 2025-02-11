@@ -174,8 +174,7 @@ export default async function ListPage({ params, searchParams }: PageProps) {
         comment: item.comment,
         properties: item.properties?.map(prop => ({
           id: Math.random().toString(36).slice(2),
-          type: prop.type,
-          label: prop.label,
+          tag: prop.tag,
           value: prop.value
         }))
       })) || [],
