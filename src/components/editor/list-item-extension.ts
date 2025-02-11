@@ -176,7 +176,7 @@ export const ListItemExtension = Node.create({
   addCommands() {
     return {
       toggleListItem: () => ({ commands }) => {
-        return commands.toggleList('listItem', 'paragraph')
+        return false
       },
       setListItemActive: (pos: number | null) => ({ tr, dispatch }) => {
         if (!dispatch) return true
@@ -224,13 +224,52 @@ export const ListItemExtension = Node.create({
         return splitListItem(state.schema.nodes.listItem)(state, dispatch)
       },
       sinkListItem: () => ({ state, dispatch }) => {
-        // Only allow sinking if we're not already in a nested list
         const { $from } = state.selection
+
+        // Get the current list item's position and node
+        let listItemPos = null
+        let listItemNode = null
+        let depth = $from.depth
+        
+        // Walk up the tree to find the list item node
+        while (depth > 0) {
+          const node = $from.node(depth)
+          if (node.type.name === 'listItem') {
+            listItemPos = $from.before(depth)
+            listItemNode = node
+            break
+          }
+          depth--
+        }
+
+        if (listItemPos === null || !listItemNode) return false
+
+        // Check if we're already in a nested list
         const grandParent = $from.node(-3)
         if (grandParent && grandParent.type.name === 'listItem') {
-          // Already nested, don't allow further nesting
           return false
         }
+
+        // Check if this item has any direct child lists
+        let hasChildList = false
+        listItemNode.content.forEach(child => {
+          if (child.type.name === 'bulletList' || child.type.name === 'orderedList') {
+            hasChildList = true
+          }
+        })
+
+        // Don't allow indentation if the node has child lists
+        if (hasChildList) {
+          return false
+        }
+
+        // Check if there's a previous sibling that we can indent under
+        const $pos = state.doc.resolve(listItemPos)
+        const index = $pos.index()
+        if (index === 0) {
+          return false // Can't indent the first item
+        }
+
         return sinkListItem(state.schema.nodes.listItem)(state, dispatch)
       },
       liftListItem: () => ({ state, dispatch }) => {
@@ -253,6 +292,19 @@ export const ListItemExtension = Node.create({
   addKeyboardShortcuts() {
     return {
       Enter: () => {
+        const { $from, empty } = this.editor.state.selection
+        const node = $from.node()
+
+        // Check if current node is empty
+        const isEmpty = node.content.size === 0 || 
+          (node.content.size === 2 && node.firstChild?.type.name === 'paragraph' && node.firstChild.content.size === 0)
+
+        // If the current node is empty, prevent creating a new one
+        if (empty && isEmpty) {
+          return true // Prevent default behavior and stop propagation
+        }
+
+        // Otherwise, proceed with normal split
         return this.editor.commands.splitListItem()
       },
       Tab: () => {
@@ -260,6 +312,18 @@ export const ListItemExtension = Node.create({
       },
       'Shift-Tab': () => {
         return this.editor.commands.liftListItem()
+      },
+      // Prevent Backspace from breaking out of list when at start of first item
+      Backspace: () => {
+        const { empty, $anchor } = this.editor.state.selection
+        const isAtStart = $anchor.pos === 1
+
+        // If we're at the very start of the first list item
+        if (empty && isAtStart) {
+          return true // Prevent default behavior
+        }
+
+        return false // Let other handlers take care of it
       },
     }
   },
@@ -319,10 +383,8 @@ export const ListItemExtension = Node.create({
       // Plugin to disable ProseMirror's default drag behavior
       new Plugin({
         props: {
-          // Prevent ProseMirror from creating drag decorations
           nodeViews: {
             listItem: (_node, _view, _getPos) => {
-              // Disable ProseMirror's built-in drag decoration for list items
               return {
                 dom: document.createElement('li'),
                 contentDOM: document.createElement('div'),
@@ -333,9 +395,7 @@ export const ListItemExtension = Node.create({
               }
             }
           },
-          // Prevent selection during drag
           createSelectionBetween: () => null,
-          // Prevent default decorations
           decorations: () => DecorationSet.empty
         }
       }),
@@ -352,11 +412,9 @@ export const ListItemExtension = Node.create({
               return false
             },
             drop: (view, event) => {
-              // Don't clear anything here - handleDrop will handle cleanup
               return false
             },
             dragend: (view, event) => {
-              // Only clear if we're not in the middle of a drop operation
               if (!view.hasFocus()) {
                 this.storage.isDragging = false
                 this.storage.draggedTag = null
@@ -373,7 +431,7 @@ export const ListItemExtension = Node.create({
           handleDrop: (view: EditorView, event: DragEvent, _slice: Slice, _moved: boolean) => {
             const { state, dispatch } = view
             const { activeItemPos } = this.storage
-            const draggedTag = this.storage.draggedTag // Capture tag before any operations
+            const draggedTag = this.storage.draggedTag
 
             if (activeItemPos === null) return false
 
@@ -428,14 +486,13 @@ export const ListItemExtension = Node.create({
               // Handle dropping at the end of the list
               const lastItem = listItems[listItems.length - 1]
               const lastItemBottom = lastItem.rect ? lastItem.rect.bottom - editorRect.top : 0
-              const dropBuffer = 20 // Reduced from 100 to make it less sensitive
+              const dropBuffer = 20
 
               if (relativeY > lastItemBottom - dropBuffer) {
                 const $lastPos = state.doc.resolve(lastItem.pos)
                 const parentDepth = $lastPos.depth - 1
                 const parentNode = $lastPos.node(parentDepth)
                 
-                // Only allow dropping at the end if we're in the same parent list
                 if ($lastPos.depth === sourceDepth && parentNode.type.name === $sourcePos.node(sourceDepth - 1).type.name) {
                   targetPos = lastItem.pos
                   insertAfter = true
@@ -570,6 +627,31 @@ export const ListItemExtension = Node.create({
               return false
             }
           }
+        }
+      }),
+
+      // Plugin to maintain list structure
+      new Plugin({
+        appendTransaction: (transactions, oldState, newState) => {
+          // Skip if no changes
+          if (!transactions.some(tr => tr.docChanged)) return null
+
+          const tr = newState.tr
+
+          // If document is empty or has no list items, create one
+          if (newState.doc.childCount === 0 || !newState.doc.firstChild?.type.name.includes('List')) {
+            const listType = this.editor.isActive('bulletList') ? 'bulletList' : 'orderedList'
+            tr.replaceWith(0, newState.doc.content.size, this.editor.schema.nodes[listType].create(
+              null,
+              [this.editor.schema.nodes.listItem.create(
+                null,
+                [this.editor.schema.nodes.paragraph.create()]
+              )]
+            ))
+            return tr
+          }
+
+          return null
         }
       })
     ]
