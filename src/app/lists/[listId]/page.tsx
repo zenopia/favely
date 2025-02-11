@@ -10,6 +10,7 @@ import { notFound, redirect } from "next/navigation";
 import type { EnhancedList, ListCategory } from "@/types/list";
 import { ListPageContent } from "./list-page-content";
 import { Metadata } from "next";
+import { wrapUrlsInAnchors } from "@/lib/utils";
 
 interface PageProps {
   params: {
@@ -167,11 +168,11 @@ export default async function ListPage({ params, searchParams }: PageProps) {
       description: list.description,
       category: list.category as ListCategory,
       privacy: list.privacy,
-      listType: list.listType || 'bullets',
+      listType: list.listType,
       items: list.items?.map(item => ({
         id: Math.random().toString(36).slice(2),
-        title: item.title,
-        comment: item.comment,
+        title: wrapUrlsInAnchors(item.title),
+        comment: item.comment ? wrapUrlsInAnchors(item.comment) : undefined,
         properties: item.properties?.map(prop => ({
           id: Math.random().toString(36).slice(2),
           tag: prop.tag,

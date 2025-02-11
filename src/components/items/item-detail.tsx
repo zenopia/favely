@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Link2 } from "lucide-react";
 import type { ListItem } from "@/types/list";
 import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
+import { wrapUrlsInAnchors } from "@/lib/utils";
 
 interface ItemDetailProps {
   item: ListItem;
@@ -15,9 +16,10 @@ export function ItemDetail({ item, rank }: ItemDetailProps) {
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="space-y-1">
-              <h3 className="font-semibold leading-none tracking-tight">
-                {rank}. {item.title}
-              </h3>
+              <h3 
+                className="font-semibold leading-none tracking-tight"
+                dangerouslySetInnerHTML={{ __html: `${rank}. ${wrapUrlsInAnchors(item.title)}` }}
+              />
             </div>
           </div>
         </CardHeader>
@@ -25,7 +27,10 @@ export function ItemDetail({ item, rank }: ItemDetailProps) {
           {item.comment && (
             <div>
               <h4 className="font-medium mb-1">Comment</h4>
-              <p className="text-sm text-muted-foreground">{item.comment}</p>
+              <p 
+                className="text-sm text-muted-foreground"
+                dangerouslySetInnerHTML={{ __html: wrapUrlsInAnchors(item.comment) }}
+              />
             </div>
           )}
 
@@ -33,7 +38,7 @@ export function ItemDetail({ item, rank }: ItemDetailProps) {
             <div className="space-y-4">
               {item.properties.map(prop => (
                 <div key={prop.id}>
-                  <h4 className="font-medium mb-1">{prop.label}</h4>
+                  <h4 className="font-medium mb-1">{prop.tag || 'Property'}</h4>
                   {prop.type === 'link' ? (
                     <a 
                       href={prop.value}

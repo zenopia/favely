@@ -1,11 +1,63 @@
 'use client';
 
 import type { EnhancedList, ListItem } from "@/types/list";
-import { Lock, EyeOff } from "lucide-react";
+import { Lock, EyeOff, ExternalLink } from "lucide-react";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import { toast } from "sonner";
 import { ItemDetailsOverlay } from "@/components/items/item-details-overlay";
 import { useState } from "react";
+
+// Function to detect URLs in text
+function detectUrls(text: string): Array<{ url: string; index: number }> {
+  const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+  const urls: Array<{ url: string; index: number }> = [];
+  let match;
+  
+  while ((match = urlRegex.exec(text)) !== null) {
+    urls.push({ url: match[0], index: match.index });
+  }
+  
+  return urls;
+}
+
+// Function to render text with clickable URLs
+function TextWithUrls({ text }: { text: string }) {
+  const urls = detectUrls(text);
+  if (urls.length === 0) return <>{text}</>;
+
+  let lastIndex = 0;
+  const elements: JSX.Element[] = [];
+
+  urls.forEach(({ url, index }, i) => {
+    // Add text before the URL
+    if (index > lastIndex) {
+      elements.push(<span key={`text-${i}`}>{text.slice(lastIndex, index)}</span>);
+    }
+    
+    // Add the URL as a link
+    elements.push(
+      <a
+        key={`link-${i}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary hover:underline inline-flex items-center gap-1"
+      >
+        {url}
+        <ExternalLink className="h-3 w-3" />
+      </a>
+    );
+    
+    lastIndex = index + url.length;
+  });
+
+  // Add any remaining text after the last URL
+  if (lastIndex < text.length) {
+    elements.push(<span key="text-end">{text.slice(lastIndex)}</span>);
+  }
+
+  return <>{elements}</>;
+}
 
 interface ItemViewProps {
   list: EnhancedList;
@@ -28,12 +80,15 @@ export function ItemView({
         throw new Error('Item not found');
       }
 
-      const response = await fetch(`/api/${list.owner.username}/lists/${list.id}/items/${itemIndex}`, {
+      const response = await fetch(`/api/lists/${list.id}/items`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(details),
+        body: JSON.stringify({
+          index: itemIndex,
+          ...details
+        }),
       });
 
       if (!response.ok) {
@@ -88,9 +143,13 @@ export function ItemView({
           </div>
 
           <div className="rounded-lg border bg-card p-4">
-            <div className="font-medium">{item.title}</div>
+            <div className="font-medium">
+              <TextWithUrls text={item.title} />
+            </div>
             {item.comment && (
-              <div className="mt-1 text-sm text-muted-foreground">{item.comment}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                <TextWithUrls text={item.comment} />
+              </div>
             )}
             {Array.isArray(item.properties) && item.properties.length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-2">
@@ -101,12 +160,15 @@ export function ItemView({
                         href={prop.value}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary hover:underline"
+                        className="text-primary hover:underline inline-flex items-center gap-1"
                       >
                         {prop.value}
+                        <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : (
-                      <span>{prop.value}</span>
+                      <span>
+                        <TextWithUrls text={prop.value} />
+                      </span>
                     )}
                   </li>
                 ))}

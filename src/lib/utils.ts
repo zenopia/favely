@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { List } from "@/types/list";
+import type { List, ListCategory } from "@/types/list";
 import type { MongoListDocument, MongoUserDocument } from "@/types/mongo";
 import type { UserProfileDocument } from "@/lib/db/models-v2/user-profile";
 
@@ -18,7 +18,7 @@ export function serializeList(list: MongoListDocument): List {
     id: list._id.toString(),
     title: list.title,
     description: list.description,
-    category: list.category,
+    category: list.category as ListCategory,
     privacy: list.privacy,
     listType: list.listType || 'ordered',
     owner: {
@@ -27,41 +27,39 @@ export function serializeList(list: MongoListDocument): List {
       username: list.owner.username,
       joinedAt: list.owner.joinedAt?.toISOString() || new Date().toISOString()
     },
-    items: list.items.map(item => ({
+    items: (list.items || []).map(item => ({
       id: crypto.randomUUID(),
       title: item.title,
       comment: item.comment,
-      rank: item.rank,
       properties: item.properties?.map(prop => ({
         id: crypto.randomUUID(),
         type: (prop.type || 'text') as 'text' | 'link',
-        label: prop.label,
+        tag: prop.tag,
         value: prop.value
       }))
     })),
     stats: {
-      viewCount: list.stats.viewCount,
-      pinCount: list.stats.pinCount,
-      copyCount: list.stats.copyCount
+      viewCount: list.stats?.viewCount || 0,
+      pinCount: list.stats?.pinCount || 0,
+      copyCount: list.stats?.copyCount || 0
     },
     collaborators: list.collaborators?.map(collab => ({
-      id: collab.userId?.toString() || collab.clerkId,
-      clerkId: collab.clerkId,
-      username: collab.username,
+      id: collab.userId?.toString() || collab.clerkId || crypto.randomUUID(),
+      clerkId: collab.clerkId || '',
+      username: collab.username || '',
       role: collab.role,
       status: collab.status,
       invitedAt: collab.invitedAt.toISOString(),
       acceptedAt: collab.acceptedAt?.toISOString()
     })),
-    lastEditedAt: list.lastEditedAt?.toISOString(),
-    createdAt: list.createdAt?.toISOString(),
-    updatedAt: list.updatedAt?.toISOString(),
+    createdAt: list.createdAt?.toISOString() || new Date().toISOString(),
+    updatedAt: list.updatedAt?.toISOString() || new Date().toISOString(),
     editedAt: list.editedAt?.toISOString()
   };
 }
 
 export function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat("en-GB", {
     month: "long",
     day: "numeric",
     year: "numeric",
@@ -103,4 +101,14 @@ export function isProfileComplete(profile: Partial<UserProfileDocument> | null):
 export function formatDisplayName(firstName: string | null | undefined, lastName: string | null | undefined, username: string): string {
   const fullName = [firstName, lastName].filter(Boolean).join(' ');
   return fullName || username;
+}
+
+/**
+ * Detects URLs in text and wraps them in anchor tags that open in a new tab
+ */
+export function wrapUrlsInAnchors(text: string): string {
+  const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
+  return text.replace(urlRegex, (url) => {
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">${url}</a>`;
+  });
 } 

@@ -90,7 +90,7 @@ export function ListViewNav({
               size="icon"
               onClick={onCollaboratorsClick}
               className={cn(
-                "h-10 px-3 min-w-fit flex items-center gap-3 whitespace-nowrap mr-4",
+                "h-10 px-3 min-w-fit flex items-center gap-3 whitespace-nowrap",
                 showCollaborators && "bg-accent"
               )}
             >

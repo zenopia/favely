@@ -63,15 +63,16 @@ export function ItemForm({ mode = 'create', listId, defaultValues }: ItemFormPro
 
     try {
       const response = await fetch(
-        mode === 'create'
-          ? `/api/lists/${listId}/items`
-          : `/api/lists/${listId}/items/${defaultValues?.id}`,
+        `/api/lists/${listId}/items`,
         {
-          method: mode === 'create' ? 'POST' : 'PUT',
+          method: mode === 'create' ? 'POST' : 'PATCH',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(data),
+          body: JSON.stringify(mode === 'create' ? data : {
+            index: defaultValues?.id,
+            ...data
+          }),
         }
       );
 

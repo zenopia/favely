@@ -8,7 +8,7 @@ interface MyListsLayoutProps {
   lists: EnhancedList[];
   nextCursor?: string;
   hasMore: boolean;
-  fetchMore: (cursor: string) => Promise<{
+  fetchMore: (cursor?: string) => Promise<{
     lists: EnhancedList[];
     nextCursor?: string;
     hasMore: boolean;
