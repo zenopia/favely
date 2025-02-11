@@ -1,7 +1,7 @@
 'use client';
 
 import type { EnhancedList, ListItem } from "@/types/list";
-import { Lock } from "lucide-react";
+import { Lock, EyeOff } from "lucide-react";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import { toast } from "sonner";
 import { ItemDetailsOverlay } from "@/components/items/item-details-overlay";
@@ -22,7 +22,13 @@ export function ItemView({
 
   const handleDetailsUpdate = async (details: { title: string; comment?: string; properties?: Array<{ type?: 'text' | 'link'; tag?: string; value: string; }> }) => {
     try {
-      const response = await fetch(`/api/${list.owner.username}/lists/${list.id}/items/${item.id}`, {
+      // Find the index of the current item in the list's items array
+      const itemIndex = (list.items || []).findIndex(i => i.id === item.id);
+      if (itemIndex === -1) {
+        throw new Error('Item not found');
+      }
+
+      const response = await fetch(`/api/${list.owner.username}/lists/${list.id}/items/${itemIndex}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -57,6 +63,9 @@ export function ItemView({
               {list.privacy === 'private' && (
                 <Lock className="h-4 w-4 text-muted-foreground" />
               )}
+              {list.privacy === 'unlisted' && (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
           </div>
 
@@ -67,7 +76,7 @@ export function ItemView({
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Item #{item.id}</h2>
+            <h2 className="text-xl font-semibold">Item #{(list.items || []).findIndex(i => i.id === item.id) + 1}</h2>
             {isOwner && (
               <button
                 onClick={() => setShowDetails(true)}

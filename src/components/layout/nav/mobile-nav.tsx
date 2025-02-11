@@ -168,14 +168,17 @@ export function MobileNav() {
         >
           <div className="flex flex-col h-full">
             <div className="flex justify-left mb-6">
-              <Image
-                src="/Favely-logo.svg"
-                alt="Favely"
-                className="h-[30px] w-[120px]"
-                width={120}
-                height={30}
-                priority
-              />
+              <div className="flex flex-col items-start">
+                <Image
+                  src="/Favely-logo.svg"
+                  alt="Favely"
+                  className="h-[30px] w-[120px]"
+                  width={120}
+                  height={30}
+                  priority
+                />
+                <span className="text-[10px] font-semibold tracking-wider text-[#801CCC] bg-[#801CCC]/10 px-2 py-0.5 rounded-full mt-1">BETA</span>
+              </div>
             </div>
 
             {isSignedIn && (

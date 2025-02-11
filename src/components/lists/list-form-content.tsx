@@ -71,7 +71,7 @@ const formSchema = z.object({
   description: z.string()
     .max(500, "Description cannot exceed 500 characters")
     .optional(),
-  privacy: z.enum(["public", "private"] as const),
+  privacy: z.enum(["public", "unlisted", "private"] as const),
   listType: z.enum(["ordered", "bullet", "task"] as const),
 });
 
@@ -359,6 +359,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="public">Public</SelectItem>
+                      <SelectItem value="unlisted">Unlisted</SelectItem>
                       <SelectItem value="private">Private</SelectItem>
                     </SelectContent>
                   </Select>
@@ -411,7 +412,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
           </div>
         </div>
 
-        <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75">
+        <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/75 z-20">
           <div className="container max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-4">
               {mode === 'edit' && (

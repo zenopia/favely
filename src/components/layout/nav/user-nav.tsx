@@ -69,83 +69,79 @@ export function UserNav() {
         </Avatar>
       </Button>
 
-      {open && (
-        <Portal>
-          <div 
-            className={cn(
-              "fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-300",
-              open ? "opacity-100" : "opacity-0 pointer-events-none"
-            )}
-            onClick={() => setOpen(false)}
-            style={{ zIndex: 9999 }}
-          />
+      <Portal>
+        <div 
+          className={cn(
+            "fixed inset-0 bg-background/80 backdrop-blur-sm z-50 transition-all duration-300",
+            open ? "opacity-100" : "opacity-0 pointer-events-none"
+          )}
+          onClick={() => setOpen(false)}
+        />
 
-          <div 
-            className={cn(
-              "fixed inset-y-0 right-0 h-full w-[280px] bg-white dark:bg-background p-6 shadow-lg transition-transform duration-300 ease-in-out border-l",
-              open ? "translate-x-0" : "translate-x-full"
-            )}
-            style={{ zIndex: 10000 }}
-          >
-            <div className="flex flex-col h-full">
-              <div className="flex flex-col items-end space-y-2 mb-6">
-                <Avatar className="h-16 w-16">
-                  {user.imageUrl && imageLoaded ? (
-                    <AvatarImage 
-                      src={user.imageUrl}
-                      alt={user.fullName || user.username || ""}
-                      loading="eager"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <AvatarFallback>{initials}</AvatarFallback>
-                  )}
-                </Avatar>
-                <div className="flex flex-col items-end">
-                  <p className="text-sm font-medium leading-none">{user.fullName || user.username}</p>
-                  <p className="text-xs leading-none text-muted-foreground mt-1">
-                    {user.email}
-                  </p>
-                </div>
+        <div 
+          className={cn(
+            "fixed inset-y-0 right-0 h-full w-[280px] bg-white dark:bg-background p-6 shadow-lg border-l z-[51] transition-all duration-300 ease-in-out transform",
+            open ? "translate-x-0" : "translate-x-full"
+          )}
+        >
+          <div className="flex flex-col h-full">
+            <div className="flex flex-col items-end space-y-2 mb-6">
+              <Avatar className="h-16 w-16">
+                {user.imageUrl && imageLoaded ? (
+                  <AvatarImage 
+                    src={user.imageUrl}
+                    alt={user.fullName || user.username || ""}
+                    loading="eager"
+                    className="object-cover"
+                  />
+                ) : (
+                  <AvatarFallback>{initials}</AvatarFallback>
+                )}
+              </Avatar>
+              <div className="flex flex-col items-end">
+                <p className="text-sm font-medium leading-none">{user.fullName || user.username}</p>
+                <p className="text-xs leading-none text-muted-foreground mt-1">
+                  {user.email}
+                </p>
               </div>
-
-              <div className="h-px bg-border my-4" />
-
-              <nav className="flex flex-col space-y-4">
-                <Link
-                  href={`/profile/${user.username}`}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-                >
-                  <User className="h-4 w-4" />
-                  <span>Profile</span>
-                </Link>
-                <Link
-                  href="/profile/settings"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-                >
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
-                </Link>
-
-                <div className="h-px bg-border my-2" />
-
-                <button
-                  onClick={() => {
-                    setOpen(false);
-                    signOut();
-                  }}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent w-full text-left"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Sign out</span>
-                </button>
-              </nav>
             </div>
+
+            <div className="h-px bg-border my-4" />
+
+            <nav className="flex flex-col space-y-4">
+              <Link
+                href={`/profile/${user.username}`}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                <User className="h-4 w-4" />
+                <span>Profile</span>
+              </Link>
+              <Link
+                href="/profile/settings"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </Link>
+
+              <div className="h-px bg-border my-2" />
+
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  signOut();
+                }}
+                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent w-full text-left"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Sign out</span>
+              </button>
+            </nav>
           </div>
-        </Portal>
-      )}
+        </div>
+      </Portal>
     </>
   );
 } 

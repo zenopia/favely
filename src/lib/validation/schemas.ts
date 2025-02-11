@@ -19,7 +19,7 @@ export const listSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(100, 'Title is too long'),
   category: z.enum(['movies', 'tv-shows', 'books', 'restaurants', 'recipes', 'things-to-do', 'other'] as const) satisfies z.ZodType<ListCategory>,
   description: z.string().max(500, 'Description is too long').optional(),
-  privacy: z.enum(['public', 'private'] as const) satisfies z.ZodType<ListPrivacy>,
+  privacy: z.enum(['public', 'unlisted', 'private'] as const) satisfies z.ZodType<ListPrivacy>,
   listType: z.enum(['ordered', 'bullet']).default('ordered'),
   items: z.array(listItemSchema)
     .min(1, 'List must have at least one item')

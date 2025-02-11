@@ -3,7 +3,7 @@
 import { EnhancedList } from "@/types/list";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import ListActionBar from "@/components/lists/list-action-bar";
-import { Eye, Pin, Copy, Lock, Pen, Plus } from "lucide-react";
+import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { EditListFAB } from "@/components/layout/FABs/edit-list-fab";
 import { UserCard } from "@/components/users/user-card";
@@ -84,6 +84,9 @@ export function ListView({
               <CategoryBadge category={list.category} />
               {list.privacy === 'private' && (
                 <Lock className="h-4 w-4 text-muted-foreground" />
+              )}
+              {list.privacy === 'unlisted' && (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
               )}
             </div>
           </div>

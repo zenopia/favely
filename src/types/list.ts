@@ -20,6 +20,7 @@ export const LIST_CATEGORIES: ListCategory[] = [
 
 export const PRIVACY_OPTIONS = [
   { value: 'public', label: 'Public' },
+  { value: 'unlisted', label: 'Unlisted' },
   { value: 'private', label: 'Private' }
 ] as const;
 
@@ -29,7 +30,7 @@ export const OWNER_FILTER_OPTIONS = [
   { value: 'collaborated', label: 'Collaborated Lists' }
 ] as const;
 
-export type ListPrivacy = 'public' | 'private';
+export type ListPrivacy = 'public' | 'unlisted' | 'private';
 export type ListType = 'ordered' | 'bullet';
 
 export interface ListItem {

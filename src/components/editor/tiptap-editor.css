@@ -540,11 +540,3 @@
 .ProseMirror ol li ul li ol li {
   background-color: rgba(188, 2, 255, 0.15) !important;
 }
-
-/* Ensure sticky elements stay on top */
-.sticky, 
-.fixed,
-[data-sticky="true"] {
-  position: sticky !important;
-  z-index: 10 !important;
-}

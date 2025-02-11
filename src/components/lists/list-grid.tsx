@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ListSearchControls } from "@/components/lists/list-search-controls";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Lock, ListChecks, Eye, Pin, PenLine } from "lucide-react";
+import { Lock, ListChecks, Eye, Pin, PenLine, EyeOff } from "lucide-react";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -111,6 +111,9 @@ export function ListGrid({
                           <CategoryBadge category={list.category} />
                           {showPrivacyBadge && list.privacy === 'private' && (
                             <Lock className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          {showPrivacyBadge && list.privacy === 'unlisted' && (
+                            <EyeOff className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>
                       </div>

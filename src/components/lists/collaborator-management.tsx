@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { X, Globe, Lock } from "lucide-react";
+import { X, Globe, Lock, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { CollaboratorCard } from "@/components/users/collaborator-card";
@@ -10,6 +10,13 @@ import { UserCombobox } from "@/components/users/user-combobox";
 import { useAuthService } from "@/lib/services/auth.service";
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface UserInviteValue {
   type: 'user';
@@ -49,9 +56,9 @@ interface FollowingUser {
 interface CollaboratorManagementProps {
   listId: string;
   isOwner: boolean;
-  privacy: 'public' | 'private';
+  privacy: 'public' | 'unlisted' | 'private';
   onClose: () => void;
-  onPrivacyChange?: (privacy: 'public' | 'private') => void;
+  onPrivacyChange?: (privacy: 'public' | 'unlisted' | 'private') => void;
   currentUserRole?: 'owner' | 'admin' | 'editor' | 'viewer';
   owner: {
     clerkId: string;
@@ -277,9 +284,11 @@ export function CollaboratorManagement({
     }
   };
 
-  const togglePrivacy = async () => {
-    const newPrivacy = privacy === "public" ? "private" : "public";
+  const togglePrivacy = async (newPrivacy: 'public' | 'unlisted' | 'private') => {
     setIsLoading(true);
+    // Update state immediately for smoother UI
+    setPrivacy(newPrivacy);
+    
     try {
       const response = await fetch(`/api/lists/${listId}`, {
         method: "PATCH",
@@ -292,11 +301,12 @@ export function CollaboratorManagement({
       });
 
       if (!response.ok) {
+        // Revert on error
+        setPrivacy(privacy);
         throw new Error();
       }
 
       const updatedList = await response.json();
-      setPrivacy(updatedList.privacy);
       onPrivacyChange?.(updatedList.privacy);
       toast.success("Privacy updated!");
     } catch (error) {
@@ -444,7 +454,8 @@ export function CollaboratorManagement({
       <div 
         className={cn(
           "fixed inset-y-0 right-0 w-[400px] bg-background shadow-lg pointer-events-auto",
-          "border-l transition-transform duration-300 ease-in-out",
+          "border-l transition-transform duration-300 ease-in-out transform",
+          "z-[101] max-h-screen overflow-hidden",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
@@ -475,28 +486,42 @@ export function CollaboratorManagement({
                     <div className="flex items-center gap-2">
                       {privacy === "public" ? (
                         <Globe className="h-4 w-4" />
+                      ) : privacy === "unlisted" ? (
+                        <EyeOff className="h-4 w-4" />
                       ) : (
                         <Lock className="h-4 w-4" />
                       )}
                       <h3 className="font-medium">
-                        {privacy === "public" ? "Public" : "Private"} List
+                        {privacy === "public" ? "Public" : privacy === "unlisted" ? "Unlisted" : "Private"} List
                       </h3>
                     </div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground pr-2">
                       {privacy === "public"
                         ? "Anyone can view this list"
-                        : "Only collaborators can view this list"}
+                        : privacy === "unlisted"
+                        ? "Anyone with the link can view this list. The list wont appear in your profile or in search results."
+                        : "Only you and your added collaborators can view this list"}
                     </p>
                   </div>
                   {(isOwner || collaborators.some(c => c.role === 'admin')) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={togglePrivacy}
+                    <Select
+                      value={privacy}
+                      onValueChange={(value: 'public' | 'unlisted' | 'private') => {
+                        if (value !== privacy) {
+                          togglePrivacy(value);
+                        }
+                      }}
                       disabled={isLoading}
                     >
-                      Make {privacy === "public" ? "Private" : "Public"}
-                    </Button>
+                      <SelectTrigger className="w-[110px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="z-[200]" position="popper" side="bottom">
+                        <SelectItem value="public">Public</SelectItem>
+                        <SelectItem value="unlisted">Unlisted</SelectItem>
+                        <SelectItem value="private">Private</SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
                 </div>
               </div>
