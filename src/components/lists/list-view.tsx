@@ -3,13 +3,15 @@
 import { EnhancedList } from "@/types/list";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import ListActionBar from "@/components/lists/list-action-bar";
-import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff, ExternalLink } from "lucide-react";
+import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { EditListFAB } from "@/components/layout/FABs/edit-list-fab";
 import { UserCard } from "@/components/users/user-card";
 import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
 import { CollaboratorManagement } from "@/components/lists/collaborator-management";
 import { useAuthService } from "@/lib/services/auth.service";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 interface ListViewProps {
   list: EnhancedList;
@@ -85,6 +87,7 @@ export function ListView({
   onPinChange
 }: ListViewProps) {
   const { user, isSignedIn } = useAuthService();
+  const [showProperties, setShowProperties] = useState(false);
 
   const handlePinChange = (newPinned: boolean) => {
     onPinChange?.(newPinned);
@@ -129,7 +132,7 @@ export function ListView({
             <div key="title-description" className="space-y-1">
               <h1 className="text-2xl font-bold">{list.title}</h1>
               {list.description && (
-                <p className="text-muted-foreground">{list.description}</p>
+                <p className="text-muted-foreground whitespace-pre-wrap">{list.description}</p>
               )}
             </div>
             <div key="category-privacy" className="flex items-center gap-2">
@@ -145,7 +148,27 @@ export function ListView({
         </div>
 
         <div className="items-section space-y-4">
-          <h2 className="text-xl font-semibold">Items</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Items</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setShowProperties(!showProperties)}
+            >
+              {showProperties ? (
+                <div className="flex items-center gap-2">
+                  Hide Details
+                  <ChevronUp className="h-4 w-4" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  Show Details
+                  <ChevronDown className="h-4 w-4" />
+                </div>
+              )}
+            </Button>
+          </div>
           {Array.isArray(list.items) && list.items.length > 0 ? (
             <ul className="space-y-2">
               {list.items.map((item, index) => {
@@ -169,11 +192,11 @@ export function ListView({
                         <TextWithUrls text={item.title} />
                       </div>
                       {item.comment && (
-                        <div className="mt-1 text-sm text-muted-foreground">
+                        <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
                           <TextWithUrls text={item.comment} />
                         </div>
                       )}
-                      {Array.isArray(item.properties) && item.properties.length > 0 && (
+                      {showProperties && Array.isArray(item.properties) && item.properties.length > 0 && (
                         <ul className="mt-2 flex flex-wrap gap-2">
                           {item.properties.map((prop) => {
                             const propKey = `${itemKey}-prop-${prop.id}`;
@@ -191,7 +214,7 @@ export function ListView({
                                     <ExternalLink className="h-3 w-3" />
                                   </a>
                                 ) : (
-                                  <span key={`${propKey}-value`}>
+                                  <span key={`${propKey}-value`} className="whitespace-pre-wrap">
                                     <TextWithUrls text={prop.value} />
                                   </span>
                                 )}

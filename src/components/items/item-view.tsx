@@ -125,7 +125,7 @@ export function ItemView({
           </div>
 
           {list.description && (
-            <p className="text-muted-foreground text-sm">{list.description}</p>
+            <p className="text-muted-foreground text-sm whitespace-pre-wrap">{list.description}</p>
           )}
         </div>
 
@@ -143,11 +143,11 @@ export function ItemView({
           </div>
 
           <div className="rounded-lg border bg-card p-4">
-            <div className="font-medium">
+            <div className="font-medium whitespace-pre-wrap">
               <TextWithUrls text={item.title} />
             </div>
             {item.comment && (
-              <div className="mt-1 text-sm text-muted-foreground">
+              <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
                 <TextWithUrls text={item.comment} />
               </div>
             )}
@@ -166,7 +166,7 @@ export function ItemView({
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     ) : (
-                      <span>
+                      <span className="whitespace-pre-wrap">
                         <TextWithUrls text={prop.value} />
                       </span>
                     )}
