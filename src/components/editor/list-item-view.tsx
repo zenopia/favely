@@ -209,9 +209,14 @@ export default function ListItemView({
     event.stopPropagation()
     const pos = getPos()
     
-    // Store the tag in both the ref and the extension storage
+    // Store the tag and node ID in both the ref and the extension storage
     draggedTagRef.current = tag || null
-    editor.storage.listItem.draggedTag = tag || null
+    editor.storage.listItem = {
+      ...editor.storage.listItem,
+      draggedTag: tag || null,
+      draggedNodeId: node.attrs.nodeId,
+      sourcePos: pos
+    }
     
     editor.commands.setListItemActive(pos)
     editor.commands.command(({ tr }) => {
@@ -226,6 +231,7 @@ export default function ListItemView({
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', '')
     event.dataTransfer.setData('application/tag', tag || '')
+    event.dataTransfer.setData('application/node-id', node.attrs.nodeId || '')
   }
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -297,7 +303,56 @@ export default function ListItemView({
     const touchStartHandler = (e: TouchEvent) => {
       e.preventDefault()
       const pos = getPos()
+      
+      // Store the tag and node ID in both the ref and the extension storage
+      draggedTagRef.current = tag || null
+      editor.storage.listItem = {
+        ...editor.storage.listItem,
+        draggedTag: tag || null,
+        draggedNodeId: node.attrs.nodeId,
+        sourcePos: pos
+      }
+      
+      // Log the touch start for debugging
+      console.log('Touch start:', {
+        node: {
+          id: node.attrs.nodeId,
+          tag: tag,
+          position: pos
+        },
+        attrs: node.attrs // Log all attributes
+      })
+      
       editor.commands.setListItemActive(pos)
+      editor.commands.command(({ tr }) => {
+        // First, store the current state of all nodes
+        const originalNodes = new Map()
+        tr.doc.descendants((node, pos) => {
+          if (node.type.name === 'listItem') {
+            originalNodes.set(node.attrs.nodeId, {
+              attrs: { ...node.attrs }
+            })
+          }
+        })
+
+        // Set dragging state for the current node
+        tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          dragging: true,
+          active: true
+        })
+
+        // Ensure other nodes maintain their original attributes
+        tr.doc.descendants((node, pos) => {
+          if (node.type.name === 'listItem' && node.attrs.nodeId !== node.attrs.nodeId) {
+            const originalNode = originalNodes.get(node.attrs.nodeId)
+            if (originalNode) {
+              tr.setNodeMarkup(pos, undefined, originalNode.attrs)
+            }
+          }
+        })
+        return true
+      })
     }
 
     const touchMoveHandler = (e: TouchEvent) => {
@@ -330,24 +385,76 @@ export default function ListItemView({
       e.preventDefault()
       const touch = e.changedTouches[0]
       const target = document.elementFromPoint(touch.clientX, touch.clientY)
+      const initialPos = getPos()
       
       if (target) {
         const listItem = target.closest('.list-item')
         if (listItem) {
+          // Create a DataTransfer object with the tag information
+          const dataTransfer = new DataTransfer()
+          dataTransfer.setData('text/plain', '')
+          dataTransfer.setData('application/tag', tag || '')
+          dataTransfer.setData('application/node-id', node.attrs.nodeId || '')
+          
+          // Store the tag and node ID in the editor storage
+          editor.storage.listItem = {
+            ...editor.storage.listItem,
+            draggedTag: tag || null,
+            draggedNodeId: node.attrs.nodeId,
+            sourcePos: initialPos
+          }
+
+          // Log state before creating drop event
+          console.log('Touch end - before drop:', {
+            node: {
+              id: node.attrs.nodeId,
+              tag: tag,
+              position: initialPos
+            },
+            attrs: node.attrs // Log all attributes
+          })
+
+          // Create and dispatch the synthetic drop event
           const dropEvent = new DragEvent('drop', {
             clientX: touch.clientX,
             clientY: touch.clientY,
             bubbles: true,
             cancelable: true,
-            dataTransfer: new DataTransfer()
+            dataTransfer
           })
+
           editor.view.dom.dispatchEvent(dropEvent)
         }
+      }
+      
+      // Clear drag state only if the node still exists
+      try {
+        const currentNode = editor.state.doc.nodeAt(initialPos)
+        if (currentNode) {
+          editor.commands.command(({ tr }) => {
+            tr.setNodeMarkup(initialPos, undefined, {
+              ...node.attrs,
+              dragging: false
+            })
+            return true
+          })
+        }
+      } catch (error) {
+        console.debug('Node position no longer exists after drag')
       }
       
       document.querySelectorAll('.drop-target').forEach(el => {
         el.classList.remove('drop-target', 'drop-target-top', 'drop-target-bottom')
       })
+      
+      // Clear stored tag references
+      draggedTagRef.current = null
+      editor.storage.listItem = {
+        ...editor.storage.listItem,
+        draggedTag: null,
+        draggedNodeId: null,
+        sourcePos: null
+      }
     }
 
     dragHandle.addEventListener('touchstart', touchStartHandler, { passive: false })
@@ -359,7 +466,7 @@ export default function ListItemView({
       dragHandle.removeEventListener('touchmove', touchMoveHandler)
       dragHandle.removeEventListener('touchend', touchEndHandler)
     }
-  }, [editor.commands, editor.view.dom, getPos])
+  }, [editor.commands, editor.view.dom, getPos, node.attrs, tag])
 
   // Add a useEffect to update tag menu position when the list item moves
   useEffect(() => {
@@ -411,8 +518,13 @@ export default function ListItemView({
           )}
           contentEditable={false} 
           onClick={handleTagClick}
+          data-tag={tag || ''}
         >
-          {tag ? <span key={tag}>{tag}</span> : <Tag className="h-4 w-4" />}
+          {tag ? (
+            <span key={`tag-${node.attrs.nodeId}-${tag}`}>{tag}</span>
+          ) : (
+            <Tag className="h-4 w-4" />
+          )}
         </div>
 
         <NodeViewContent className="list-item-content" />

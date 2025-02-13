@@ -7,7 +7,7 @@
 }
 
 .ProseMirror {
-  padding: 1rem;
+  padding: 0.2rem;
   border-radius: 0.5rem;
   border: 1px solid #e2e8f0;
   min-height: 150px;
@@ -15,6 +15,8 @@
   margin-bottom: 4rem; /* Add margin to prevent overlap with sticky bar */
   position: relative;
   z-index: 1; /* Ensure editor is below sticky elements */
+  max-width: 100%; /* Ensure editor doesn't exceed screen width */
+  overflow-x: auto; /* Add horizontal scrolling only if content overflows */
 }
 
 .ProseMirror > * + * {
@@ -27,6 +29,20 @@
   padding-left: 1.5rem !important;
   margin: 0.5rem 0;
   list-style-position: outside !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reduce indentation for nested lists */
+.ProseMirror li ul,
+.ProseMirror li ol {
+  padding-left: 0rem !important;
+}
+
+/* Even less indentation for deeper nested levels */
+.ProseMirror li li ul,
+.ProseMirror li li ol {
+  padding-left: 0.75rem !important;
 }
 
 .ProseMirror ul {
@@ -151,6 +167,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem; /* Space between elements */
+  max-width: 100%; /* Ensure list items don't exceed container width */
+  box-sizing: border-box; /* Include padding in width calculation */
+  word-break: break-word; /* Allow long words to break */
 }
 
 /* Hide tag button by default on all list items */
@@ -303,14 +322,14 @@
 .ProseMirror li > ul,
 .ProseMirror li > ol {
   margin: 0.2rem 0;
-  padding-left: 1rem !important;
+  padding-left: 0.5rem !important;
   width: 100%;
 }
 
 /* Adjust spacing for nested items */
 .ProseMirror .list-item .list-item {
   margin-left: 0;
-  padding-left: 2rem;
+  padding-left: 1.8rem;
 }
 
 /* List item content */
@@ -321,6 +340,9 @@
   z-index: 1;
   display: inline-flex;
   align-items: center;
+  max-width: 100%; /* Ensure content doesn't exceed container width */
+  overflow-wrap: break-word; /* Allow long words to break */
+  word-wrap: break-word;
 }
 
 /* Active state */
@@ -351,37 +373,6 @@
 .ProseMirror .list-item > ol > li.is-selected {
   background-color: rgba(59, 130, 246, 0.1);
   border-color: rgb(59, 130, 246);
-}
-
-/* Ensure proper spacing for nested lists */
-.ProseMirror li > ul,
-.ProseMirror li > ol {
-  margin: 0.2rem 0;
-  padding-left: 1rem !important;
-}
-
-/* Adjust spacing for nested items */
-.ProseMirror .list-item .list-item {
-  margin-left: 0;
-  padding-left: 2rem;
-}
-
-/* Drag handle */
-.ProseMirror .list-item .drag-handle {
-  left: 0.5rem;
-  top: 0.5rem;
-}
-
-/* Show drag handle for active and selected items */
-.ProseMirror .list-item.is-active .drag-handle,
-.ProseMirror .list-item.is-selected .drag-handle,
-.ProseMirror .list-item:hover .drag-handle {
-  opacity: 1;
-}
-
-.ProseMirror .list-item.is-active .drag-handle,
-.ProseMirror .list-item.is-selected .drag-handle {
-  color: rgb(59, 130, 246);
 }
 
 /* Dragging styles */
@@ -452,7 +443,7 @@
 
 /* Adjust drag handle position for nested items */
 .ProseMirror .list-item .list-item .drag-handle {
-  left: 0.2rem;
+  left: 0.1rem;
   top: 0.5rem;
 }
 
@@ -464,7 +455,7 @@
   position: relative;
   margin: 0.2rem 0;
   padding: 0.5rem;
-  padding-left: 1.5rem; /* Reduce padding to account for moved handle */
+  padding-left: 1.2rem;
   border-radius: 0.5rem;
   cursor: pointer;
   background-color: rgba(239, 194, 255, 0.15) !important;

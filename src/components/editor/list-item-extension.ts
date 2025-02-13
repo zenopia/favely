@@ -53,6 +53,7 @@ export interface ListItemAttributes {
   dragging?: boolean,
   tag?: string,
   category?: string,
+  nodeId?: string,
 }
 
 // Custom drag view to override ProseMirror's default
@@ -94,6 +95,7 @@ export const ListItemExtension = Node.create({
       activeItemPos: null as number | null,
       isDragging: false,
       draggedTag: null as string | null,
+      draggedNodeId: null as string | null,
     }
   },
 
@@ -140,6 +142,16 @@ export const ListItemExtension = Node.create({
             return {}
           }
           return { 'data-category': attributes.category }
+        },
+      },
+      nodeId: {
+        default: null,
+        parseHTML: element => element.getAttribute('data-node-id') || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        renderHTML: attributes => {
+          if (!attributes.nodeId) {
+            return {}
+          }
+          return { 'data-node-id': attributes.nodeId }
         },
       },
     }
@@ -430,6 +442,7 @@ export const ListItemExtension = Node.create({
             const { state, dispatch } = view
             const { activeItemPos } = this.storage
             const draggedTag = this.storage.draggedTag
+            const draggedNodeId = this.storage.draggedNodeId
 
             if (activeItemPos === null) return false
 
@@ -440,8 +453,42 @@ export const ListItemExtension = Node.create({
               const sourceNode = state.doc.nodeAt(activeItemPos)
               if (!sourceNode) return false
 
+              // Store original nodes and their attributes from initial state
+              const originalNodesByPosition = new Map()
+              const originalNodesById = new Map()
+              
+              // Find the node under the dragged item
+              const nodeUnderDragged = state.doc.nodeAt(activeItemPos + sourceNode.nodeSize)
+              const nodeUnderDraggedPos = activeItemPos + sourceNode.nodeSize
+              
+              // Store the original attributes of the node under the dragged item
+              const nodeUnderDraggedOriginalAttrs = nodeUnderDragged ? { ...nodeUnderDragged.attrs } : null
+              
+              console.log('Node under dragged item (before):', {
+                node: nodeUnderDragged ? {
+                  id: nodeUnderDragged.attrs.nodeId,
+                  tag: nodeUnderDragged.attrs.tag,
+                  position: nodeUnderDraggedPos
+                } : null
+              })
+
+              state.doc.descendants((node, pos) => {
+                if (node.type.name === 'listItem') {
+                  // Store complete node attributes by position and ID
+                  originalNodesByPosition.set(pos, {
+                    attrs: { ...node.attrs },
+                    nodeSize: node.nodeSize
+                  })
+                  originalNodesById.set(node.attrs.nodeId, {
+                    attrs: { ...node.attrs },
+                    nodeSize: node.nodeSize,
+                    pos: pos
+                  })
+                }
+              })
+
               // Create a single transaction for all changes
-              const dropTr = state.tr
+              const tr = state.tr
 
               // Store the source node's complete state
               const sourceNodeSize = sourceNode.nodeSize
@@ -568,51 +615,85 @@ export const ListItemExtension = Node.create({
               const parentEnd = $insertPos.end($insertPos.depth - 1)
               insertPos = Math.max(0, Math.min(insertPos, parentEnd))
 
-              // Create a new node with the preserved tag
-              const finalAttrs = {
-                active: true,
-                dragging: false,
-                tag: draggedTag || sourceNode.attrs.tag,
-                category: sourceNode.attrs.category
-              }
+              // Store the dragged node's attributes
+              const draggedNodeAttrs = { ...sourceNode.attrs }
+              const draggedNodeId = draggedNodeAttrs.nodeId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-              // Create the new node
+              // Log the state before node deletion
+              console.log('State before node deletion:', {
+                draggedNode: {
+                  id: draggedNodeId,
+                  tag: draggedNodeAttrs.tag,
+                  position: activeItemPos
+                }
+              })
+
+              // Delete the old node
+              tr.delete(activeItemPos, sourceNodeEnd)
+
+              // Create and insert the new node with its original attributes
               const newNode = sourceNode.type.create(
-                { ...finalAttrs, _key: Date.now() },
+                {
+                  ...draggedNodeAttrs,
+                  active: true,
+                  dragging: false,
+                  nodeId: draggedNodeId,
+                },
                 sourceNode.content,
                 sourceNode.marks
               )
 
-              // Delete the old node
-              dropTr.delete(activeItemPos, sourceNodeEnd)
+              // Insert at the target position
+              tr.insert(insertPos, newNode)
 
-              // Insert the new node
-              dropTr.insert(insertPos, newNode)
+              // Restore original attributes for all nodes based on their IDs
+              tr.doc.descendants((node, pos) => {
+                if (node.type.name === 'listItem') {
+                  const originalNode = originalNodesById.get(node.attrs.nodeId)
+                  if (originalNode && node.attrs.nodeId !== draggedNodeId) {
+                    // Preserve the original attributes for nodes that aren't the dragged node
+                    tr.setNodeMarkup(pos, undefined, {
+                      ...originalNode.attrs,
+                      active: node.attrs.active,
+                      dragging: false
+                    })
+                  }
+                }
+              })
 
-              // Set the node's final attributes
-              dropTr.setNodeMarkup(insertPos, undefined, finalAttrs)
+              // After all modifications, find the node that was under the dragged item in its new position
+              const finalNodeUnderOriginalPos = tr.doc.nodeAt(activeItemPos)
+              if (finalNodeUnderOriginalPos) {
+                const originalNode = originalNodesById.get(finalNodeUnderOriginalPos.attrs.nodeId)
+                if (originalNode) {
+                  // Restore the original attributes of the node that moved up
+                  tr.setNodeMarkup(activeItemPos, undefined, {
+                    ...originalNode.attrs,
+                    active: finalNodeUnderOriginalPos.attrs.active,
+                    dragging: false
+                  })
+                }
+              }
+              
+              console.log('Node under original position (after):', {
+                node: finalNodeUnderOriginalPos ? {
+                  id: finalNodeUnderOriginalPos.attrs.nodeId,
+                  tag: nodeUnderDraggedOriginalAttrs?.tag, // Log the original tag we're restoring
+                  position: activeItemPos
+                } : null
+              })
 
-              // Dispatch all changes at once
-              dispatch(dropTr)
+              // Apply all changes in a single transaction
+              dispatch(tr)
 
               // Update storage
               this.storage.activeItemPos = insertPos
-              this.storage.draggedTag = null
-
-              // Set the active state and force a re-render
-              this.editor.commands.command(({ state: commandState, dispatch: commandDispatch }) => {
-                if (!commandDispatch) return true
-                const updateTr = commandState.tr
-                const node = updateTr.doc.nodeAt(insertPos)
-                if (node) {
-                  updateTr.setNodeMarkup(insertPos, undefined, {
-                    ...finalAttrs,
-                    _forceUpdate: Date.now()
-                  })
-                  commandDispatch(updateTr)
-                }
-                return true
-              })
+              this.storage.listItem = {
+                ...this.storage.listItem,
+                draggedTag: null,
+                draggedNodeId: null,
+                sourcePos: null
+              }
 
               // Clear drop targets
               clearDropTargets(view)
@@ -621,6 +702,7 @@ export const ListItemExtension = Node.create({
             } catch (error) {
               console.error('Error during drag and drop:', error)
               this.storage.activeItemPos = null
+              this.storage.draggedNodeId = null
               clearDropTargets(view)
               return false
             }
