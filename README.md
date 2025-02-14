@@ -1,4 +1,4 @@
-# RankShare
+# Favely
 
 A web application for creating and sharing ranked lists of recommendations.
 

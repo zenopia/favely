@@ -686,8 +686,36 @@ export const ListItemExtension = Node.create({
               // Apply all changes in a single transaction
               dispatch(tr)
 
-              // Update storage
+              // Update storage and set focus to the new position of the dragged item
               this.storage.activeItemPos = insertPos
+              this.editor.commands.setListItemActive(insertPos)
+              
+              // Ensure the dragged item is active and others are not
+              this.editor.commands.command(({ tr }) => {
+                // Clear active state from all list items
+                tr.doc.descendants((node, pos) => {
+                  if (node.type.name === 'listItem') {
+                    tr.setNodeMarkup(pos, undefined, {
+                      ...node.attrs,
+                      active: false,
+                      dragging: false
+                    })
+                  }
+                })
+
+                // Set active state only for the dragged item at its new position
+                const draggedNode = tr.doc.nodeAt(insertPos)
+                if (draggedNode) {
+                  tr.setNodeMarkup(insertPos, undefined, {
+                    ...draggedNode.attrs,
+                    active: true,
+                    dragging: false
+                  })
+                }
+
+                return true
+              })
+
               this.storage.listItem = {
                 ...this.storage.listItem,
                 draggedTag: null,
