@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ListCategory } from "@/types/list";
@@ -92,13 +92,14 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [completedStates, setCompletedStates] = useState<Record<string, boolean>>({});
+
   const [editorContent, setEditorContent] = useState(() => {
     if (defaultValues?.items) {
-      // Convert existing items to HTML list with correct list type
+
       const listTag = defaultValues.listType === 'bullet' ? 'ul' : 'ol';
       const itemsHtml = defaultValues.items
         .map(item => {
-          // Create child items HTML for the properties
           const childItemsHtml = item.properties?.length 
             ? `<${listTag}>${item.properties.map(prop => {
                 const tagAttr = prop.tag ? ` data-tag="${prop.tag}"` : '';
@@ -106,15 +107,34 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
               }).join('')}</${listTag}>`
             : '';
 
-          // Return parent item with its children nested inside
-          return `<li data-type="listItem"><p>${item.title}</p>${childItemsHtml}</li>`;
+          const nodeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          // Explicitly check the completed state and convert to string
+          const isCompleted = item.completed === true;
+          const completedAttr = ` data-completed="${isCompleted}"`;
+          
+          const itemHtml = `<li data-type="listItem" data-node-id="${nodeId}"${completedAttr} data-category="${defaultValues.category}"><p>${item.title}</p>${childItemsHtml}</li>`;
+          return itemHtml;
         })
         .join('');
 
-      return `<${listTag}>${itemsHtml}</${listTag}>`;
+      const finalHtml = `<${listTag}>${itemsHtml}</${listTag}>`;
+      return finalHtml;
     }
     return '';
   });
+
+  // Initialize completed states from defaultValues
+  useEffect(() => {
+    if (defaultValues?.items) {
+      const states = defaultValues.items.reduce((acc, item) => {
+        if (item.completed) {
+          acc[item.id] = true;
+        }
+        return acc;
+      }, {} as Record<string, boolean>);
+      setCompletedStates(states);
+    }
+  }, [defaultValues]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -178,7 +198,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
           // Only add parent items to the list
           acc.push({
             title: textContent,
-            completed: false,
+            completed: item.getAttribute('data-completed') === 'true',
             properties: properties
           });
         }
@@ -273,6 +293,95 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       toast.error(error instanceof Error ? error.message : 'Failed to delete list');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCompletedChange = async (completed: boolean, nodeId: string) => {
+    if (!defaultValues?.id) return;
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(editorContent, 'text/html');
+      const listItems = Array.from(doc.querySelectorAll('li'));
+      
+      // Find the changing item
+      const changingItem = listItems.find(item => item.getAttribute('data-node-id') === nodeId);
+      if (changingItem) {
+        // Update local state
+        const itemId = defaultValues.items.find(item => 
+          item.title === changingItem.textContent?.trim()
+        )?.id;
+
+        if (itemId) {
+          setCompletedStates(prev => ({
+            ...prev,
+            [itemId]: completed
+          }));
+        }
+      }
+
+      // Process list items including completed state from our local state
+      const processedItems = listItems.reduce((acc, item) => {
+        const isChildItem = item.parentElement?.parentElement?.tagName.toLowerCase() === 'li';
+        
+        if (!isChildItem) {
+          const textContent = Array.from(item.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
+            .map(node => node.textContent)
+            .join('')
+            .trim();
+
+          // Find the corresponding item in defaultValues
+          const originalItem = defaultValues.items.find(i => i.title === textContent);
+          
+          const properties = item.querySelector('ul, ol')
+            ? Array.from(item.querySelector('ul, ol')?.querySelectorAll(':scope > li') ?? []).map(childItem => ({
+                tag: childItem.getAttribute('data-tag') || undefined,
+                value: childItem.textContent?.trim() || ''
+              }))
+            : [];
+
+          acc.push({
+            id: originalItem?.id,
+            title: textContent,
+            completed: originalItem?.id 
+              ? completedStates[originalItem.id] || false
+              : item.getAttribute('data-completed') === 'true',
+            properties
+          });
+        }
+        return acc;
+      }, [] as {
+        id?: string;
+        title: string;
+        completed: boolean;
+        properties: {
+          tag?: string;
+          value: string;
+        }[];
+      }[]);
+
+      const response = await fetch(`/api/lists/${defaultValues.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: form.getValues('title'),
+          category: form.getValues('category'),
+          description: form.getValues('description'),
+          privacy: form.getValues('privacy'),
+          listType: form.getValues('listType'),
+          items: processedItems
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update list');
+      }
+    } catch (error) {
+      console.error('Error updating list:', error);
+      toast.error('Failed to update list');
     }
   };
 
@@ -404,6 +513,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                   }}
                   defaultListType={form.getValues("listType")}
                   onListTypeChange={(type) => form.setValue("listType", type)}
+                  onCompletedChange={handleCompletedChange}
                   category={form.getValues("category")}
                   placeholder="Start your list..."
                 />

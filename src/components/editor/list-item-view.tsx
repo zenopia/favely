@@ -3,7 +3,7 @@ import { NodeViewWrapper, NodeViewContent, Editor, Extension } from '@tiptap/rea
 import { createPortal } from 'react-dom'
 import { ListItemAttributes } from './list-item-extension'
 import categoryTags from '@/lib/tagMappings'
-import { Tag } from 'lucide-react'
+import { Tag, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ListItemViewProps {
@@ -23,13 +23,20 @@ export default function ListItemView({
   getPos,
   editor,
 }: ListItemViewProps) {
-  const { active, dragging, tag, category } = node.attrs as ListItemAttributes
+  const { active, dragging, tag, category, completed } = node.attrs as ListItemAttributes
   const ref = useRef<HTMLDivElement>(null)
   const dragHandleRef = useRef<HTMLDivElement>(null)
   const tagButtonRef = useRef<HTMLDivElement>(null)
   const draggedTagRef = useRef<string | null>(null)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
+
+  // Check if this is a parent (top-level) list item
+  const isParentItem = useMemo(() => {
+    const pos = getPos()
+    const $pos = editor.state.doc.resolve(pos)
+    return $pos.depth <= 1
+  }, [editor.state.doc, getPos])
 
   // Get all used tags in the current child list
   const getUsedTags = useCallback(() => {
@@ -209,12 +216,13 @@ export default function ListItemView({
     event.stopPropagation()
     const pos = getPos()
     
-    // Store the tag and node ID in both the ref and the extension storage
+    // Store the tag, node ID, and completed state
     draggedTagRef.current = tag || null
     editor.storage.listItem = {
       ...editor.storage.listItem,
       draggedTag: tag || null,
       draggedNodeId: node.attrs.nodeId,
+      draggedCompleted: completed,  // Store completed state
       sourcePos: pos
     }
     
@@ -223,7 +231,8 @@ export default function ListItemView({
       tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
         dragging: true,
-        active: true
+        active: true,
+        completed: completed  // Preserve completed state
       })
       return true
     })
@@ -232,6 +241,7 @@ export default function ListItemView({
     event.dataTransfer.setData('text/plain', '')
     event.dataTransfer.setData('application/tag', tag || '')
     event.dataTransfer.setData('application/node-id', node.attrs.nodeId || '')
+    event.dataTransfer.setData('application/completed', String(completed))  // Store completed state
   }
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -269,7 +279,8 @@ export default function ListItemView({
     editor.commands.command(({ tr }) => {
       tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
-        dragging: false
+        dragging: false,
+        completed: completed  // Preserve completed state
       })
       return true
     })
@@ -294,6 +305,12 @@ export default function ListItemView({
       dataTransfer: event.dataTransfer
     })
     editor.view.dom.dispatchEvent(dropEvent)
+  }
+
+  const handleCompletedChange = (event: React.MouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    editor.commands.toggleCompleted()
   }
 
   useEffect(() => {
@@ -491,12 +508,21 @@ export default function ListItemView({
       <NodeViewWrapper 
         as="li" 
         ref={ref}
-        className={`list-item ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${dragging ? 'is-dragging' : ''}`}
+        className={cn(
+          'list-item',
+          selected && 'is-selected',
+          active && 'is-active',
+          dragging && 'is-dragging',
+          completed && 'border-green-500 border-2',
+          'relative'
+        )}
         onClick={handleClick}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         data-category={category}
+        data-completed={completed}
+        data-node-id={node.attrs.nodeId}
       >
         <div 
           ref={dragHandleRef}
@@ -510,24 +536,41 @@ export default function ListItemView({
           ⋮⋮
         </div>
 
-        <div 
-          ref={tagButtonRef}
-          className={cn(
-            'tag-button',
-            tag ? 'has-tag' : 'no-tag'
+        <div className="flex items-start gap-2 flex-1 pt-1">
+          {isParentItem && (
+            <div
+              className={cn(
+                'checkbox-wrapper',
+                'flex items-center justify-center w-6 h-6 rounded border border-input hover:bg-accent hover:text-accent-foreground cursor-pointer',
+                completed && 'bg-primary border-primary text-primary-foreground'
+              )}
+              contentEditable={false}
+              onClick={handleCompletedChange}
+              data-completed={completed}
+            >
+              {completed && <Check className="h-4 w-4 stroke-[3]" />}
+            </div>
           )}
-          contentEditable={false} 
-          onClick={handleTagClick}
-          data-tag={tag || ''}
-        >
-          {tag ? (
-            <span key={`tag-${node.attrs.nodeId}-${tag}`}>{tag}</span>
-          ) : (
-            <Tag className="h-4 w-4" />
-          )}
-        </div>
 
-        <NodeViewContent className="list-item-content" />
+          <div 
+            ref={tagButtonRef}
+            className={cn(
+              'tag-button',
+              tag ? 'has-tag' : 'no-tag'
+            )}
+            contentEditable={false} 
+            onClick={handleTagClick}
+            data-tag={tag || ''}
+          >
+            {tag ? (
+              <span key={`tag-${node.attrs.nodeId}-${tag}`}>{tag}</span>
+            ) : (
+              <Tag className="h-4 w-4" />
+            )}
+          </div>
+
+          <NodeViewContent className="list-item-content" />
+        </div>
       </NodeViewWrapper>
 
       {showTagMenu && createPortal(

@@ -176,6 +176,7 @@ export async function getEnhancedLists(
         title: item.title,
         comment: item.comment,
         rank: item.rank,
+        completed: item.completed || false,
         properties: item.properties?.map(prop => ({
           id: crypto.randomUUID(),
           type: prop.type as 'text' | 'link',

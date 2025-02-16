@@ -6,6 +6,7 @@ export interface TiptapEditorProps {
   content?: string
   onChange?: (content: string) => void
   onListTypeChange?: (type: ListType) => void
+  onCompletedChange?: (completed: boolean, nodeId: string) => void
   defaultListType?: ListType
   className?: string
   editable?: boolean

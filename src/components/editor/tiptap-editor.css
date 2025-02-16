@@ -146,10 +146,11 @@
   pointer-events: none;
 }
 
-/* Ensure list markers are visible */
+/* Ensure list markers are visible and aligned to top */
 .ProseMirror ul li::marker,
 .ProseMirror ol li::marker {
   color: #64748b;
+  vertical-align: top;
 }
 
 /* List item styles */
@@ -157,7 +158,7 @@
   position: relative;
   margin: 0.2rem 0;
   padding: 0.5rem;
-  padding-left: 2.5rem; /* Space for drag handle only */
+  padding-right: 2.5rem; /* Change padding-left to padding-right */
   border-radius: 0.5rem;
   cursor: pointer;
   background-color: transparent;
@@ -165,11 +166,66 @@
   transition: all 0.2s ease;
   min-height: 2.5rem;
   display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  max-width: 100%;
+  box-sizing: border-box;
+  word-break: break-word;
+}
+
+/* Checkbox styles */
+.ProseMirror .list-item .checkbox-wrapper {
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem; /* Space between elements */
-  max-width: 100%; /* Ensure list items don't exceed container width */
-  box-sizing: border-box; /* Include padding in width calculation */
-  word-break: break-word; /* Allow long words to break */
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.25rem;
+  border: 2px solid #94a3b8;
+  background-color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 0.25rem; /* Add top margin to align with text */
+}
+
+.ProseMirror .list-item .checkbox-wrapper:hover {
+  border-color: #64748b;
+  background-color: #f8fafc;
+}
+
+.ProseMirror .list-item .checkbox-wrapper:active {
+  transform: scale(0.95);
+}
+
+.ProseMirror .list-item[data-completed="true"] {
+  border: 2px solid #22c55e;
+}
+
+.ProseMirror .list-item[data-completed="true"] .checkbox-wrapper {
+  background-color: #22c55e;
+  border-color: #22c55e;
+}
+
+.ProseMirror .list-item[data-completed="true"] .checkbox-wrapper svg {
+  color: white;
+  stroke-width: 3px;
+}
+
+/* List item content */
+.ProseMirror .list-item .list-item-content {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: flex-start; /* Change from center to flex-start */
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  margin: 0;
+  padding: 0;
 }
 
 /* Hide tag button by default on all list items */
@@ -281,11 +337,10 @@
 }
 
 /* Drag handle */
-.ProseMirror .list-item .drag-handle{
+.ProseMirror .list-item .drag-handle {
   position: absolute;
-  left: 0.5rem;
-  top: 0.5rem; /* Align to top with some padding */
-  transform: none; /* Remove vertical centering transform */
+  right: 0.5rem; /* Change left to right */
+  top: 0.75rem;
   font-size: 1.2rem;
   line-height: 1;
   color: #64748b;
@@ -329,20 +384,7 @@
 /* Adjust spacing for nested items */
 .ProseMirror .list-item .list-item {
   margin-left: 0;
-  padding-left: 1.8rem;
-}
-
-/* List item content */
-.ProseMirror .list-item .list-item-content {
-  flex: 1;
-  min-width: 0;
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  max-width: 100%; /* Ensure content doesn't exceed container width */
-  overflow-wrap: break-word; /* Allow long words to break */
-  word-wrap: break-word;
+  padding-left: 0.4rem;
 }
 
 /* Active state */
@@ -443,7 +485,7 @@
 
 /* Adjust drag handle position for nested items */
 .ProseMirror .list-item .list-item .drag-handle {
-  left: 0.1rem;
+  right: 0.1rem; /* Change left to right */
   top: 0.5rem;
 }
 
@@ -465,7 +507,7 @@
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  align-items: center;
+  align-items: flex-start; /* Change to flex-start */
   gap: 0.5rem;
   width: 100%;
   margin-left: 0;
@@ -478,10 +520,11 @@
 .ProseMirror ol li ul li > div {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start; /* Change to flex-start */
   gap: 0.5rem;
   flex: 1;
   min-width: 0;
+  padding-top: 0; /* Remove any top padding */
 }
 
 /* Sub-list item content */
@@ -494,7 +537,7 @@
   position: relative;
   z-index: 1;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start; /* Change to flex-start */
 }
 
 /* Show tag button on sub-list items */
@@ -530,4 +573,35 @@
 .ProseMirror ul li ol li ul li,
 .ProseMirror ol li ul li ol li {
   background-color: rgba(188, 2, 255, 0.15) !important;
+}
+
+/* Ensure proper spacing for nested lists */
+.ProseMirror li > ul,
+.ProseMirror li > ol {
+  margin: 0.2rem 0;
+  padding-left: 0.5rem !important;
+  width: 100%;
+}
+
+/* Adjust list markers for all levels */
+.ProseMirror li::marker {
+  vertical-align: top !important;
+}
+
+/* Specific adjustments for nested list markers */
+.ProseMirror li li::marker {
+  vertical-align: top !important;
+}
+
+/* Remove any vertical centering from list items */
+.ProseMirror li {
+  display: list-item !important;
+  list-style-position: outside !important;
+  align-items: flex-start !important;
+}
+
+/* Ensure content aligns properly */
+.ProseMirror li > p {
+  margin: 0;
+  padding: 0;
 }

@@ -21,6 +21,7 @@ function TiptapEditorComponent({
   editable = true,
   placeholder = 'Start typing...',
   category,
+  onCompletedChange,
 }: TiptapEditorProps) {
   const [currentListType, setCurrentListType] = useState<ListType>(defaultListType)
   const initialCategoryRef = useRef(category)
@@ -46,6 +47,7 @@ function TiptapEditorComponent({
     content,
     editable,
     immediatelyRender: false,
+    onCompletedChange,
     onCreate: ({ editor }) => {
       initializeEditorContent(editor, content, placeholder, defaultListType)
       setCurrentListType(defaultListType)

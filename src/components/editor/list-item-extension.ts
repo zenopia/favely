@@ -33,7 +33,17 @@ declare module '@tiptap/core' {
        * Lift the list item up from the inner list
        */
       liftListItem: () => ReturnType,
+      /**
+       * Toggle the completed state of a list item
+       */
+      toggleCompleted: () => ReturnType,
     }
+  }
+}
+
+declare module '@tiptap/core' {
+  interface EditorOptions {
+    onCompletedChange?: (completed: boolean, nodeId: string) => void
   }
 }
 
@@ -54,6 +64,7 @@ export interface ListItemAttributes {
   tag?: string,
   category?: string,
   nodeId?: string,
+  completed?: boolean,
 }
 
 // Custom drag view to override ProseMirror's default
@@ -121,6 +132,14 @@ export const ListItemExtension = Node.create({
           return { 'data-dragging': 'true' }
         },
       },
+      completed: {
+        default: false,
+        parseHTML: element => element.getAttribute('data-completed') === 'true',
+        renderHTML: attributes => {
+          // Always render the data-completed attribute
+          return { 'data-completed': attributes.completed ? 'true' : 'false' }
+        },
+      },
       tag: {
         default: null,
         parseHTML: element => {
@@ -166,10 +185,15 @@ export const ListItemExtension = Node.create({
           
           const tag = element.getAttribute('data-tag');
           const category = element.getAttribute('data-category');
+          const rawCompleted = element.getAttribute('data-completed');
+          const completed = rawCompleted === 'true';
+          const nodeId = element.getAttribute('data-node-id');
           
           return {
             tag: tag || null,
             category: category || null,
+            completed,
+            nodeId: nodeId || null,
           };
         },
       },
@@ -177,7 +201,8 @@ export const ListItemExtension = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['li', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0]
+    const mergedAttrs = mergeAttributes(this.options.HTMLAttributes, HTMLAttributes);
+    return ['li', mergedAttrs, 0]
   },
 
   addNodeView() {
@@ -296,6 +321,39 @@ export const ListItemExtension = Node.create({
         // Don't allow lifting from the outermost list
         return false
       },
+      toggleCompleted: () => ({ state, dispatch }) => {
+        const { selection } = state
+        const { $from } = selection
+        
+        let depth = $from.depth
+        let pos = $from.start()
+        
+        while (depth > 0) {
+          const node = $from.node(depth)
+          if (node.type.name === 'listItem') {
+            pos = $from.before(depth)
+            const currentCompleted = node.attrs.completed || false
+            
+            if (dispatch) {
+              const tr = state.tr
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                completed: !currentCompleted
+              })
+              dispatch(tr)
+
+              const editor = this.editor
+              if (editor && editor.options.onCompletedChange) {
+                editor.options.onCompletedChange(!currentCompleted, node.attrs.nodeId)
+              }
+            }
+            return true
+          }
+          depth--
+        }
+        
+        return false
+      },
     }
   },
 
@@ -358,7 +416,11 @@ export const ListItemExtension = Node.create({
           // Clear active state from all list items
           newState.doc.descendants((node, pos) => {
             if (node.type.name === 'listItem') {
-              tr.setNodeMarkup(pos, undefined, { ...node.attrs, active: false })
+              tr.setNodeMarkup(pos, undefined, { 
+                ...node.attrs, 
+                active: false,
+                completed: node.attrs.completed // Preserve completed state
+              })
             }
           })
 
@@ -381,7 +443,11 @@ export const ListItemExtension = Node.create({
           if (listItemPos !== null) {
             const node = newState.doc.nodeAt(listItemPos)
             if (node) {
-              tr.setNodeMarkup(listItemPos, undefined, { ...node.attrs, active: true })
+              tr.setNodeMarkup(listItemPos, undefined, { 
+                ...node.attrs, 
+                active: true,
+                completed: node.attrs.completed // Preserve completed state
+              })
               this.storage.activeItemPos = listItemPos
             }
           }
@@ -463,14 +529,6 @@ export const ListItemExtension = Node.create({
               
               // Store the original attributes of the node under the dragged item
               const nodeUnderDraggedOriginalAttrs = nodeUnderDragged ? { ...nodeUnderDragged.attrs } : null
-              
-              console.log('Node under dragged item (before):', {
-                node: nodeUnderDragged ? {
-                  id: nodeUnderDragged.attrs.nodeId,
-                  tag: nodeUnderDragged.attrs.tag,
-                  position: nodeUnderDraggedPos
-                } : null
-              })
 
               state.doc.descendants((node, pos) => {
                 if (node.type.name === 'listItem') {
@@ -617,27 +675,20 @@ export const ListItemExtension = Node.create({
 
               // Store the dragged node's attributes
               const draggedNodeAttrs = { ...sourceNode.attrs }
+              const draggedNodeCompleted = draggedNodeAttrs.completed || false
               const draggedNodeId = draggedNodeAttrs.nodeId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-              // Log the state before node deletion
-              console.log('State before node deletion:', {
-                draggedNode: {
-                  id: draggedNodeId,
-                  tag: draggedNodeAttrs.tag,
-                  position: activeItemPos
-                }
-              })
 
               // Delete the old node
               tr.delete(activeItemPos, sourceNodeEnd)
 
-              // Create and insert the new node with its original attributes
+              // Create new node with preserved completed state
               const newNode = sourceNode.type.create(
                 {
                   ...draggedNodeAttrs,
                   active: true,
                   dragging: false,
                   nodeId: draggedNodeId,
+                  completed: draggedNodeCompleted
                 },
                 sourceNode.content,
                 sourceNode.marks
@@ -646,91 +697,10 @@ export const ListItemExtension = Node.create({
               // Insert at the target position
               tr.insert(insertPos, newNode)
 
-              // Restore original attributes for all nodes based on their IDs
-              tr.doc.descendants((node, pos) => {
-                if (node.type.name === 'listItem') {
-                  const originalNode = originalNodesById.get(node.attrs.nodeId)
-                  if (originalNode && node.attrs.nodeId !== draggedNodeId) {
-                    // Preserve the original attributes for nodes that aren't the dragged node
-                    tr.setNodeMarkup(pos, undefined, {
-                      ...originalNode.attrs,
-                      active: node.attrs.active,
-                      dragging: false
-                    })
-                  }
-                }
-              })
-
-              // After all modifications, find the node that was under the dragged item in its new position
-              const finalNodeUnderOriginalPos = tr.doc.nodeAt(activeItemPos)
-              if (finalNodeUnderOriginalPos) {
-                const originalNode = originalNodesById.get(finalNodeUnderOriginalPos.attrs.nodeId)
-                if (originalNode) {
-                  // Restore the original attributes of the node that moved up
-                  tr.setNodeMarkup(activeItemPos, undefined, {
-                    ...originalNode.attrs,
-                    active: finalNodeUnderOriginalPos.attrs.active,
-                    dragging: false
-                  })
-                }
-              }
-              
-              console.log('Node under original position (after):', {
-                node: finalNodeUnderOriginalPos ? {
-                  id: finalNodeUnderOriginalPos.attrs.nodeId,
-                  tag: nodeUnderDraggedOriginalAttrs?.tag, // Log the original tag we're restoring
-                  position: activeItemPos
-                } : null
-              })
-
-              // Apply all changes in a single transaction
-              dispatch(tr)
-
-              // Update storage and set focus to the new position of the dragged item
-              this.storage.activeItemPos = insertPos
-              this.editor.commands.setListItemActive(insertPos)
-              
-              // Ensure the dragged item is active and others are not
-              this.editor.commands.command(({ tr }) => {
-                // Clear active state from all list items
-                tr.doc.descendants((node, pos) => {
-                  if (node.type.name === 'listItem') {
-                    tr.setNodeMarkup(pos, undefined, {
-                      ...node.attrs,
-                      active: false,
-                      dragging: false
-                    })
-                  }
-                })
-
-                // Set active state only for the dragged item at its new position
-                const draggedNode = tr.doc.nodeAt(insertPos)
-                if (draggedNode) {
-                  tr.setNodeMarkup(insertPos, undefined, {
-                    ...draggedNode.attrs,
-                    active: true,
-                    dragging: false
-                  })
-                }
-
-                return true
-              })
-
-              this.storage.listItem = {
-                ...this.storage.listItem,
-                draggedTag: null,
-                draggedNodeId: null,
-                sourcePos: null
-              }
-
-              // Clear drop targets
+              dispatch(tr.scrollIntoView())
               clearDropTargets(view)
-
               return true
             } catch (error) {
-              console.error('Error during drag and drop:', error)
-              this.storage.activeItemPos = null
-              this.storage.draggedNodeId = null
               clearDropTargets(view)
               return false
             }
