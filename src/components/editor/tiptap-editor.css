@@ -200,7 +200,7 @@
 }
 
 .ProseMirror .list-item[data-completed="true"] {
-  border: 2px solid #22c55e;
+  border: 1px dashed #22c55e9b;
 }
 
 .ProseMirror .list-item[data-completed="true"] .checkbox-wrapper {

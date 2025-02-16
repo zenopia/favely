@@ -5,6 +5,7 @@ import { ListItemAttributes } from './list-item-extension'
 import categoryTags from '@/lib/tagMappings'
 import { Tag, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TextSelection } from 'prosemirror-state'
 
 interface ListItemViewProps {
   node: {
@@ -143,22 +144,46 @@ export default function ListItemView({
     event.stopPropagation()
     const pos = getPos()
     
-    editor.commands.command(({ tr }) => {
+    editor.commands.command(({ tr, dispatch }) => {
+      if (!dispatch) return true
+
       // First, deactivate all list items
-      tr.doc.descendants((node, pos) => {
+      tr.doc.descendants((node, _pos) => {
         if (node.type.name === 'listItem') {
-          tr.setNodeMarkup(pos, undefined, {
+          tr.setNodeMarkup(_pos, undefined, {
             ...node.attrs,
             active: false
           })
         }
       })
 
-      // Then activate only the clicked item
+      // Then activate the clicked item
       tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
         active: true
       })
+
+      // Set text selection to the end of the content
+      const $pos = tr.doc.resolve(pos)
+      let textPos = pos + 1
+      const endPos = $pos.end()
+
+      while (textPos < endPos) {
+        const $textPos = tr.doc.resolve(textPos)
+        if ($textPos.parent.isTextblock) {
+          tr.setSelection(TextSelection.create(tr.doc, $textPos.end()))
+          break
+        }
+        textPos++
+      }
+
+      dispatch(tr)
+      
+      // Focus the editor immediately after the transaction
+      requestAnimationFrame(() => {
+        editor.view.focus()
+      })
+
       return true
     })
   }
@@ -344,7 +369,7 @@ export default function ListItemView({
       editor.commands.command(({ tr }) => {
         // First, store the current state of all nodes
         const originalNodes = new Map()
-        tr.doc.descendants((node, pos) => {
+        tr.doc.descendants((node, _pos) => {
           if (node.type.name === 'listItem') {
             originalNodes.set(node.attrs.nodeId, {
               attrs: { ...node.attrs }
@@ -483,7 +508,7 @@ export default function ListItemView({
       dragHandle.removeEventListener('touchmove', touchMoveHandler)
       dragHandle.removeEventListener('touchend', touchEndHandler)
     }
-  }, [editor.commands, editor.view.dom, getPos, node.attrs, tag])
+  }, [editor.commands, editor.view.dom, editor.state.doc, editor.storage, getPos, node.attrs, tag])
 
   // Add a useEffect to update tag menu position when the list item moves
   useEffect(() => {
@@ -513,7 +538,7 @@ export default function ListItemView({
           selected && 'is-selected',
           active && 'is-active',
           dragging && 'is-dragging',
-          completed && 'border-green-500 border-2',
+          completed && 'border-green-200 border-1',
           'relative'
         )}
         onClick={handleClick}
