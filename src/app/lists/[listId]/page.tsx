@@ -173,6 +173,7 @@ export default async function ListPage({ params, searchParams }: PageProps) {
         id: Math.random().toString(36).slice(2),
         title: wrapUrlsInAnchors(item.title),
         comment: item.comment ? wrapUrlsInAnchors(item.comment) : undefined,
+        completed: item.completed || false,
         properties: item.properties?.map(prop => ({
           id: Math.random().toString(36).slice(2),
           tag: prop.tag,

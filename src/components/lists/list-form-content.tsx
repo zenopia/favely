@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ListCategory } from "@/types/list";
@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
-import { TiptapEditor } from "@/components/editor/tiptap-editor";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +28,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TaskListEditor } from '@/components/editor/task-list-editor'
+
+interface TaskItem {
+  id: string;
+  text: string;
+  checked: boolean;
+  level: number;
+  tag?: string;
+}
 
 export interface ListFormProps {
   mode?: 'create' | 'edit';
@@ -39,15 +47,12 @@ export interface ListFormProps {
     description?: string;
     category: ListCategory;
     privacy: 'public' | 'private';
-    listType: 'ordered' | 'bullet' | 'task';
     items: Array<{
       id: string;
       title: string;
       comment?: string;
       completed?: boolean;
       properties?: Array<{
-        id: string;
-        type?: 'text' | 'link';
         tag?: string;
         value: string;
       }>;
@@ -72,7 +77,6 @@ const formSchema = z.object({
     .max(500, "Description cannot exceed 500 characters")
     .optional(),
   privacy: z.enum(["public", "unlisted", "private"] as const),
-  listType: z.enum(["ordered", "bullet", "task"] as const),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -92,49 +96,18 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [completedStates, setCompletedStates] = useState<Record<string, boolean>>({});
-
-  const [editorContent, setEditorContent] = useState(() => {
+  const [taskItems, setTaskItems] = useState<TaskItem[]>(() => {
     if (defaultValues?.items) {
-
-      const listTag = defaultValues.listType === 'bullet' ? 'ul' : 'ol';
-      const itemsHtml = defaultValues.items
-        .map(item => {
-          const childItemsHtml = item.properties?.length 
-            ? `<${listTag}>${item.properties.map(prop => {
-                const tagAttr = prop.tag ? ` data-tag="${prop.tag}"` : '';
-                return `<li data-type="listItem"${tagAttr} data-category="${defaultValues.category}"><p>${prop.value}</p></li>`;
-              }).join('')}</${listTag}>`
-            : '';
-
-          const nodeId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          // Explicitly check the completed state and convert to string
-          const isCompleted = item.completed === true;
-          const completedAttr = ` data-completed="${isCompleted}"`;
-          
-          const itemHtml = `<li data-type="listItem" data-node-id="${nodeId}"${completedAttr} data-category="${defaultValues.category}"><p>${item.title}</p>${childItemsHtml}</li>`;
-          return itemHtml;
-        })
-        .join('');
-
-      const finalHtml = `<${listTag}>${itemsHtml}</${listTag}>`;
-      return finalHtml;
+      return defaultValues.items.map(item => ({
+        id: item.id,
+        text: item.title,
+        checked: item.completed || false,
+        level: 0,
+        tag: item.properties?.[0]?.tag
+      }));
     }
-    return '';
+    return [];
   });
-
-  // Initialize completed states from defaultValues
-  useEffect(() => {
-    if (defaultValues?.items) {
-      const states = defaultValues.items.reduce((acc, item) => {
-        if (item.completed) {
-          acc[item.id] = true;
-        }
-        return acc;
-      }, {} as Record<string, boolean>);
-      setCompletedStates(states);
-    }
-  }, [defaultValues]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -143,9 +116,12 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       category: (defaultValues?.category === 'all' ? 'movies' : defaultValues?.category) || "movies",
       description: defaultValues?.description || "",
       privacy: defaultValues?.privacy || "public",
-      listType: defaultValues?.listType || "ordered",
     },
   });
+
+  const handleTaskItemsChange = (items: TaskItem[]) => {
+    setTaskItems(items);
+  };
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (!isSignedIn || !user?.username) {
@@ -153,12 +129,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       return;
     }
 
-    // Parse the editor content to get list items
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(editorContent, 'text/html');
-    const listItems = Array.from(doc.querySelectorAll('li'));
-    
-    if (listItems.length === 0) {
+    if (taskItems.length === 0) {
       toast.error("Please add at least one item to your list");
       return;
     }
@@ -166,116 +137,57 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
     setIsSubmitting(true);
 
     try {
-      // Process list items to include tags for child items
-      const processedItems = listItems.reduce((acc, item) => {
-        const isChildItem = item.parentElement?.parentElement?.tagName.toLowerCase() === 'li';
-        
-        if (!isChildItem) {
-          // This is a parent item
-          const textContent = Array.from(item.childNodes)
-            .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
-            .map(node => node.textContent)
-            .join('')
-            .trim();
-
-          // Get all child items (properties) for this parent
-          const childList = item.querySelector('ul, ol');
-          
-          const properties = childList ? Array.from(childList.querySelectorAll(':scope > li')).map(childItem => {
-            const tag = childItem.getAttribute('data-tag');
-            const value = Array.from(childItem.childNodes)
-              .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
-              .map(node => node.textContent)
-              .join('')
-              .trim();
-
-            return {
-              tag: tag || undefined,
-              value
-            };
-          }) : [];
-
-          // Only add parent items to the list
-          acc.push({
-            title: textContent,
-            completed: item.getAttribute('data-completed') === 'true',
-            properties: properties
-          });
-        }
-        
-        return acc;
-      }, [] as Array<{
-        title: string;
-        completed: boolean;
-        properties: Array<{
-          tag?: string;
-          value: string;
-        }>;
-      }>);
+      const processedItems = taskItems.map(item => ({
+        title: item.text,
+        completed: item.checked,
+        properties: item.tag ? [{ tag: item.tag, value: item.text }] : undefined
+      }));
 
       const payload = {
         title: data.title,
         category: data.category,
         description: data.description,
         privacy: data.privacy,
-        listType: data.listType,
         items: processedItems
       };
 
-      const response = await fetch(
-        mode === 'create' 
-          ? '/api/lists' 
-          : `/api/lists/${defaultValues?.id}`,
-        {
-          method: mode === 'create' ? 'POST' : 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const endpoint = mode === 'create' 
+        ? '/api/lists' 
+        : `/api/lists/${defaultValues?.id}`;
 
-      const responseData = await response.json();
+      const response = await fetch(endpoint, {
+        method: mode === 'create' ? 'POST' : 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
       if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to save list');
+        throw new Error('Failed to save list');
       }
-      
-      toast.success(
-        mode === 'create' 
-          ? "List created successfully!" 
-          : "List updated successfully!"
-      );
 
-      if (returnPath) {
-        router.push(returnPath);
-      } else {
-        const listPath = mode === 'create' 
-          ? `/lists/${responseData.id}`
-          : `/${user.username}/lists/${defaultValues?.id}`;
-        router.push(listPath);
-      }
+      const result = await response.json();
+
+      toast.success(mode === 'create' ? "List created successfully!" : "List updated successfully!");
+      router.push(returnPath || `/lists/${result.id}`);
       router.refresh();
     } catch (error) {
       console.error('Error saving list:', error);
-      toast.error(
-        error instanceof Error 
-          ? error.message 
-          : "Failed to save list"
-      );
+      toast.error("Failed to save list. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!defaultValues?.id || !isSignedIn || !user?.username) return;
-    
-    if (!confirm('Are you sure you want to delete this list? This action cannot be undone.')) {
-      return;
-    }
+    if (!defaultValues?.id) return;
+
+    const confirmed = window.confirm("Are you sure you want to delete this list?");
+    if (!confirmed) return;
 
     setIsSubmitting(true);
+
     try {
       const response = await fetch(`/api/lists/${defaultValues.id}`, {
         method: 'DELETE',
@@ -285,103 +197,14 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         throw new Error('Failed to delete list');
       }
 
-      toast.success('List deleted successfully');
-      router.push(`/${user.username}`);
+      toast.success("List deleted successfully!");
+      router.push(returnPath || '/lists');
       router.refresh();
     } catch (error) {
       console.error('Error deleting list:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete list');
+      toast.error("Failed to delete list. Please try again.");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleCompletedChange = async (completed: boolean, nodeId: string) => {
-    if (!defaultValues?.id) return;
-
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(editorContent, 'text/html');
-      const listItems = Array.from(doc.querySelectorAll('li'));
-      
-      // Find the changing item
-      const changingItem = listItems.find(item => item.getAttribute('data-node-id') === nodeId);
-      if (changingItem) {
-        // Update local state
-        const itemId = defaultValues.items.find(item => 
-          item.title === changingItem.textContent?.trim()
-        )?.id;
-
-        if (itemId) {
-          setCompletedStates(prev => ({
-            ...prev,
-            [itemId]: completed
-          }));
-        }
-      }
-
-      // Process list items including completed state from our local state
-      const processedItems = listItems.reduce((acc, item) => {
-        const isChildItem = item.parentElement?.parentElement?.tagName.toLowerCase() === 'li';
-        
-        if (!isChildItem) {
-          const textContent = Array.from(item.childNodes)
-            .filter(node => node.nodeType === Node.TEXT_NODE || (node.nodeType === Node.ELEMENT_NODE && node.nodeName === 'P'))
-            .map(node => node.textContent)
-            .join('')
-            .trim();
-
-          // Find the corresponding item in defaultValues
-          const originalItem = defaultValues.items.find(i => i.title === textContent);
-          
-          const properties = item.querySelector('ul, ol')
-            ? Array.from(item.querySelector('ul, ol')?.querySelectorAll(':scope > li') ?? []).map(childItem => ({
-                tag: childItem.getAttribute('data-tag') || undefined,
-                value: childItem.textContent?.trim() || ''
-              }))
-            : [];
-
-          acc.push({
-            id: originalItem?.id,
-            title: textContent,
-            completed: originalItem?.id 
-              ? completedStates[originalItem.id] || false
-              : item.getAttribute('data-completed') === 'true',
-            properties
-          });
-        }
-        return acc;
-      }, [] as {
-        id?: string;
-        title: string;
-        completed: boolean;
-        properties: {
-          tag?: string;
-          value: string;
-        }[];
-      }[]);
-
-      const response = await fetch(`/api/lists/${defaultValues.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: form.getValues('title'),
-          category: form.getValues('category'),
-          description: form.getValues('description'),
-          privacy: form.getValues('privacy'),
-          listType: form.getValues('listType'),
-          items: processedItems
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update list');
-      }
-    } catch (error) {
-      console.error('Error updating list:', error);
-      toast.error('Failed to update list');
     }
   };
 
@@ -506,16 +329,11 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                   Type or paste your items below.
                   Press Enter to add new items.
                 </p>
-                <TiptapEditor
-                  content={editorContent}
-                  onChange={(content) => {
-                    setEditorContent(content);
-                  }}
-                  defaultListType={form.getValues("listType")}
-                  onListTypeChange={(type) => form.setValue("listType", type)}
-                  onCompletedChange={handleCompletedChange}
-                  category={form.getValues("category")}
-                  placeholder="Start your list..."
+                <TaskListEditor
+                  initialItems={taskItems}
+                  onChange={handleTaskItemsChange}
+                  className="mt-4"
+                  category={form.watch('category')}
                 />
               </div>
             </div>

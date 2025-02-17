@@ -3,15 +3,13 @@
 import { EnhancedList } from "@/types/list";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import ListActionBar from "@/components/lists/list-action-bar";
-import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff, ExternalLink, CheckCircle2, Circle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { EditListFAB } from "@/components/layout/FABs/edit-list-fab";
 import { UserCard } from "@/components/users/user-card";
 import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
 import { CollaboratorManagement } from "@/components/lists/collaborator-management";
 import { useAuthService } from "@/lib/services/auth.service";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 
 interface ListViewProps {
   list: EnhancedList;
@@ -87,7 +85,6 @@ export function ListView({
   onPinChange
 }: ListViewProps) {
   const { user, isSignedIn } = useAuthService();
-  const [showProperties, setShowProperties] = useState(false);
 
   const handlePinChange = (newPinned: boolean) => {
     onPinChange?.(newPinned);
@@ -150,40 +147,21 @@ export function ListView({
         <div className="items-section space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Items</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => setShowProperties(!showProperties)}
-            >
-              {showProperties ? (
-                <div className="flex items-center gap-2">
-                  Hide Details
-                  <ChevronUp className="h-4 w-4" />
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  Show Details
-                  <ChevronDown className="h-4 w-4" />
-                </div>
-              )}
-            </Button>
           </div>
           {Array.isArray(list.items) && list.items.length > 0 ? (
             <ul className="space-y-2">
-              {list.items.map((item, index) => {
-                const itemKey = `item-${item.id}-${index}`;
+              {list.items.map((item) => {
                 return (
-                  <li 
-                    key={itemKey} 
-                    className="group relative flex items-stretch rounded-lg border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-all duration-200 cursor-pointer"
+                  <li
+                    key={item.id}
+                    className="flex items-start border-b last:border-b-0"
                   >
-                    <div className="flex items-center justify-center min-w-[3rem] bg-muted rounded-l-lg group-hover:bg-accent/50 transition-all duration-200">
-                      <span className="text-base font-medium text-muted-foreground group-hover:text-accent-foreground">
-                        {list.listType === 'ordered' ? (
-                          index + 1
+                    <div className="flex items-center justify-center p-4">
+                      <span className="flex items-center justify-center">
+                        {item.completed ? (
+                          <CheckCircle2 className="h-5 w-5 text-green-500" />
                         ) : (
-                          <span className="text-xl">•</span>
+                          <Circle className="h-5 w-5 text-muted-foreground" />
                         )}
                       </span>
                     </div>
@@ -195,33 +173,6 @@ export function ListView({
                         <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
                           <TextWithUrls text={item.comment} />
                         </div>
-                      )}
-                      {showProperties && Array.isArray(item.properties) && item.properties.length > 0 && (
-                        <ul className="mt-2 flex flex-wrap gap-2">
-                          {item.properties.map((prop) => {
-                            const propKey = `${itemKey}-prop-${prop.id}`;
-                            return (
-                              <li key={propKey} className="text-sm text-muted-foreground">
-                                {prop.type === 'link' ? (
-                                  <a
-                                    key={`${propKey}-link`}
-                                    href={prop.value}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-primary hover:underline inline-flex items-center gap-1"
-                                  >
-                                    {prop.value}
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                ) : (
-                                  <span key={`${propKey}-value`} className="whitespace-pre-wrap">
-                                    <TextWithUrls text={prop.value} />
-                                  </span>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
                       )}
                     </div>
                   </li>

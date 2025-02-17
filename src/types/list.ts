@@ -37,6 +37,7 @@ export interface ListItem {
   id: string;
   title: string;
   comment?: string;
+  completed?: boolean;
   properties?: Array<{
     id: string;
     type?: 'text' | 'link';
