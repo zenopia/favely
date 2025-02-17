@@ -51,6 +51,15 @@ interface SortableItemProps {
   category?: string
 }
 
+const getCategoryVar = (category?: string) => {
+  if (!category) return 'other';
+  switch (category) {
+    case 'tv-shows': return 'tv';
+    case 'things-to-do': return 'activities';
+    default: return category;
+  }
+};
+
 function SortableItem({
   id,
   item,
@@ -85,7 +94,7 @@ function SortableItem({
     backgroundColor: isDragging ? '#f3f1ff' : undefined,
     boxShadow: isDragging ? 'rgba(0, 0, 0, 0.2) 0px 5px 10px' : undefined,
     zIndex: isDragging ? 50 : undefined,
-    borderLeft: `4px solid var(--category-${category || 'other'})`,
+    borderLeft: `4px solid var(--category-${getCategoryVar(category)})`,
   };
 
   return (
@@ -96,7 +105,7 @@ function SortableItem({
         "flex items-start gap-2 p-2 rounded group relative min-h-[48px]",
         isActive && "bg-[#f3f1ff]",
         item.checked && "text-muted-foreground line-through",
-        item.tag && `border-l-[var(--category-${item.tag})]`
+        item.tag && `border-l-[var(--category-${item.tag?.replace(/\s+/g, '-')})]`
       )}
     >
       <input

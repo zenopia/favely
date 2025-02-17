@@ -10,6 +10,7 @@ import { UserCard } from "@/components/users/user-card";
 import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
 import { CollaboratorManagement } from "@/components/lists/collaborator-management";
 import { useAuthService } from "@/lib/services/auth.service";
+import { cn } from "@/lib/utils";
 
 interface ListViewProps {
   list: EnhancedList;
@@ -73,6 +74,15 @@ function TextWithUrls({ text }: { text: string }) {
 
   return <>{elements}</>;
 }
+
+const getCategoryVar = (category?: string) => {
+  if (!category) return 'other';
+  switch (category) {
+    case 'tv-shows': return 'tv';
+    case 'things-to-do': return 'activities';
+    default: return category;
+  }
+};
 
 export function ListView({ 
   list, 
@@ -154,7 +164,13 @@ export function ListView({
                 return (
                   <li
                     key={item.id}
-                    className="flex items-start border-b last:border-b-0"
+                    className="flex items-start border-b last:border-b-0 relative"
+                    style={{
+                      borderLeft: `4px solid var(--category-${getCategoryVar(list.category)})`,
+                      borderBottom: 'none',
+                      borderRadius: '0.375rem',
+                      marginBottom: '4px'
+                    }}
                   >
                     <div className="flex items-center justify-center p-4">
                       <span className="flex items-center justify-center">
@@ -166,7 +182,10 @@ export function ListView({
                       </span>
                     </div>
                     <div className="flex-1 p-4">
-                      <div className="font-medium">
+                      <div className={cn(
+                        "font-medium",
+                        item.completed && "text-muted-foreground line-through"
+                      )}>
                         <TextWithUrls text={item.title} />
                       </div>
                       {item.comment && (
