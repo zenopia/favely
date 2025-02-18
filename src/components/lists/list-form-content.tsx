@@ -160,8 +160,6 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         items: taskItems
       };
 
-      console.log('Saving payload:', JSON.stringify(payload, null, 2));
-
       const endpoint = mode === 'create' 
         ? '/api/lists' 
         : `/api/lists/${defaultValues?.id}`;
@@ -181,7 +179,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       const result = await response.json();
 
       toast.success(mode === 'create' ? "List created successfully!" : "List updated successfully!");
-      router.push(returnPath || `/lists/${result.list.id}`);
+      router.push(returnPath || `/lists/${result.id}`);
       router.refresh();
     } catch (error) {
       console.error('Error saving list:', error);

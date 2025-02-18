@@ -211,7 +211,6 @@ function SortableItem({
 
 // Convert saved items to editor items
 const convertSavedToEditorItems = (savedItems: SavedTaskItem[]): TaskItem[] => {
-  console.log('Converting saved items:', JSON.stringify(savedItems, null, 2));
   const result: TaskItem[] = [];
   
   savedItems.forEach(item => {
@@ -243,7 +242,44 @@ const convertSavedToEditorItems = (savedItems: SavedTaskItem[]): TaskItem[] => {
     }
   });
   
-  console.log('Final converted items:', JSON.stringify(result, null, 2));
+  return result;
+};
+
+// Add this function at the top level of the component
+const prepareItemsForSave = (items: TaskItem[]): SavedTaskItem[] => {
+  // Create a deep copy to avoid mutating the original items
+  const itemsCopy: TaskItem[] = JSON.parse(JSON.stringify(items));
+  const result: SavedTaskItem[] = [];
+  
+  // Process each parent item (level 0)
+  itemsCopy.forEach((item, index) => {
+    if (item.level === 0 && item.text.trim()) {  // Only include items with text
+      // Initialize the parent item
+      const parentItem: SavedTaskItem = {
+        id: item.id || Date.now().toString() + Math.random(),
+        title: item.text,
+        checked: item.checked,
+        tag: item.tag,
+        childItems: []
+      };
+
+      // Find all child items that belong to this parent
+      let childIndex = index + 1;
+      while (childIndex < itemsCopy.length && itemsCopy[childIndex].level > 0) {
+        const childItem = itemsCopy[childIndex];
+        if (childItem.text.trim()) {  // Only include child items with text
+          parentItem.childItems?.push({
+            title: childItem.text,
+            tag: childItem.tag
+          });
+        }
+        childIndex++;
+      }
+
+      result.push(parentItem);
+    }
+  });
+  
   return result;
 };
 
@@ -276,42 +312,6 @@ export function TaskListEditor({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  // Add this function at the top level of the component
-  const prepareItemsForSave = (items: TaskItem[]): SavedTaskItem[] => {
-    // Create a deep copy to avoid mutating the original items
-    const itemsCopy: TaskItem[] = JSON.parse(JSON.stringify(items));
-    const result: SavedTaskItem[] = [];
-    
-    // Process each parent item (level 0)
-    itemsCopy.forEach((item, index) => {
-      if (item.level === 0) {
-        // Initialize the parent item
-        const parentItem: SavedTaskItem = {
-          id: item.id,
-          title: item.text,
-          checked: item.checked,
-          tag: item.tag,
-          childItems: []
-        };
-
-        // Find all child items that belong to this parent
-        let childIndex = index + 1;
-        while (childIndex < itemsCopy.length && itemsCopy[childIndex].level > 0) {
-          const childItem = itemsCopy[childIndex];
-          parentItem.childItems?.push({
-            title: childItem.text,
-            tag: childItem.tag
-          });
-          childIndex++;
-        }
-
-        result.push(parentItem);
-      }
-    });
-    
-    return result;
-  };
 
   // Update items and notify parent
   const updateItems = (newItems: TaskItem[]) => {
@@ -387,28 +387,41 @@ export function TaskListEditor({
 
   // Handle indentation
   const handleIndent = (id: string) => {
-    console.log('Handling indent for item:', id);
     const index = items.findIndex(item => item.id === id);
     if (index <= 0) return; // Can't indent first item
 
-    const prevItem = items[index - 1];
     const currentItem = items[index];
-    console.log('Previous item:', JSON.stringify(prevItem, null, 2));
-    console.log('Current item:', JSON.stringify(currentItem, null, 2));
+    
+    // Find the previous parent item by going backwards until we find a level 0 item
+    let prevParentIndex = index - 1;
+    while (prevParentIndex >= 0 && items[prevParentIndex].level > 0) {
+      prevParentIndex--;
+    }
 
-    // Only allow indentation if:
-    // 1. Current item is at level 0
-    // 2. Previous item is at level 0
-    if (currentItem.level === 0 && prevItem.level === 0) {
+    // If we found a parent item
+    if (prevParentIndex >= 0) {
       const updatedItems = [...items];
+      const parentItem = updatedItems[prevParentIndex];
       
-      // Update the current item's level to 1 (max level)
+      // Update the current item's level to 1
       updatedItems[index] = {
         ...currentItem,
         level: 1
       };
+
+      // Add the current item to the parent's childItems
+      if (!parentItem.childItems) {
+        parentItem.childItems = [];
+      }
       
-      console.log('Updated items after indent:', JSON.stringify(updatedItems, null, 2));
+      parentItem.childItems.push({
+        title: currentItem.text,
+        tag: currentItem.tag
+      });
+
+      // Update the parent item
+      updatedItems[prevParentIndex] = parentItem;
+      
       updateItems(updatedItems);
     }
   };

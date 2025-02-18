@@ -18,12 +18,13 @@ interface ListQuery {
 }
 
 interface ListItem {
+  id: string;
   title: string;
   comment?: string;
   completed?: boolean;
-  properties?: Array<{
+  childItems?: Array<{
+    title: string;
     tag?: string;
-    value: string;
   }>;
 }
 
@@ -67,8 +68,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    console.log('Received request body:', JSON.stringify(body, null, 2));
-    
     const { title, description, category, visibility, items, listType = 'ordered' } = body;
 
     if (!title || !category || !visibility) {
@@ -95,34 +94,19 @@ export async function POST(req: NextRequest) {
 
     // Process items before creating document
     const processedItems = (items as ListItem[]).map(item => {
-      console.log('Processing item:', JSON.stringify(item, null, 2));
-      
-      // Ensure properties is an array and each property has the correct structure
-      const properties = Array.isArray(item.properties) 
-        ? item.properties
-          .filter(prop => prop.value) // Only include properties with values
-          .map(prop => {
-            console.log('Processing property:', JSON.stringify(prop, null, 2));
-            return {
-              tag: prop.tag || undefined,
-              value: prop.value.toString() // Ensure value is a string
-            };
-          })
-        : [];
-      
-      console.log('Processed properties:', JSON.stringify(properties, null, 2));
-
       const processedItem = {
+        id: item.id,
         title: item.title,
         completed: item.completed || false,
-        properties
+        childItems: Array.isArray(item.childItems)
+          ? item.childItems.map(child => ({
+              title: child.title,
+              tag: child.tag || undefined
+            }))
+          : []
       };
-
-      console.log('Processed item with properties:', JSON.stringify(processedItem, null, 2));
       return processedItem;
     });
-
-    console.log('Final processed items:', JSON.stringify(processedItems, null, 2));
 
     // Create the document with explicit typing for items
     const listData = {
@@ -131,14 +115,7 @@ export async function POST(req: NextRequest) {
       category,
       visibility,
       listType,
-      items: processedItems.map(item => ({
-        title: item.title,
-        completed: item.completed,
-        properties: item.properties.map(prop => ({
-          tag: prop.tag,
-          value: prop.value
-        }))
-      })),
+      items: processedItems,
       owner: {
         clerkId: userId,
         userId: mongoUser._id,
@@ -153,11 +130,7 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    console.log('Creating list with data:', JSON.stringify(listData, null, 2));
-
     const list = await ListModel.create(listData) as ListDocument;
-
-    console.log('Created document in MongoDB:', JSON.stringify(list.toObject(), null, 2));
 
     // Convert _id to string for the response
     const { _id, ...rest } = list.toObject();
@@ -176,7 +149,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(responseList);
   } catch (error) {
     console.error("Error creating list:", error);
-    // Log the full error details
     if (error instanceof Error) {
       console.error('Error details:', {
         message: error.message,
