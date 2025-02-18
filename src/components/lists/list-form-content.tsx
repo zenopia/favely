@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ListCategory } from "@/types/list";
@@ -46,7 +46,7 @@ export interface ListFormProps {
     title: string;
     description?: string;
     category: ListCategory;
-    visibility: 'public' | 'private';
+    visibility: 'public' | 'private' | 'unlisted';
     items: Array<{
       id: string;
       title: string;
@@ -116,8 +116,19 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       category: (defaultValues?.category === 'all' ? 'movies' : defaultValues?.category) || "movies",
       description: defaultValues?.description || "",
       visibility: defaultValues?.visibility || "public",
-    },
+    }
   });
+
+  useEffect(() => {
+    if (defaultValues) {
+      form.reset({
+        title: defaultValues.title,
+        category: defaultValues.category === 'all' ? 'movies' : defaultValues.category,
+        description: defaultValues.description || "",
+        visibility: defaultValues.visibility,
+      });
+    }
+  }, [form, defaultValues]);
 
   const handleTaskItemsChange = (items: TaskItem[]) => {
     setTaskItems(items);
@@ -282,7 +293,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                 <FormItem>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger className="w-[140px]">

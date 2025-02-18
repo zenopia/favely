@@ -38,7 +38,7 @@ export default async function EditListPage({ params, searchParams }: PageProps) 
       title: list.title,
       description: list.description,
       category: list.category,
-      privacy: list.privacy as 'public' | 'private',
+      visibility: list.visibility as 'public' | 'private' | 'unlisted',
       listType: list.listType || 'ordered',
       items: list.items || [],
       owner: {
