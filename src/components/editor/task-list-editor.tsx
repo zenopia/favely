@@ -507,16 +507,35 @@ export function TaskListEditor({
       return
     }
 
-    // For multiple lines, create new items
+    // Find the current item and its level
     const index = items.findIndex(item => item.id === id)
     const currentItem = items[index]
-    
-    // Create new items from the lines
-    const newItems = lines.map((line, i) => ({
+    const baseLevel = currentItem.level
+
+    // First, find the indentation of the first line to use as a baseline
+    const firstLineMatch = lines[0].match(/^[\t ]*/)
+    const baseIndentCount = firstLineMatch ? firstLineMatch[0].length : 0
+
+    // Process lines to detect hierarchy relative to the first line
+    const processedLines = lines.map(line => {
+      // Count leading spaces/tabs to determine indentation level
+      const match = line.match(/^[\t ]*/)
+      const indentCount = match ? match[0].length : 0
+      // Calculate relative indentation level compared to the first line
+      const relativeLevel = Math.floor((indentCount - baseIndentCount) / 2)
+      
+      return {
+        text: line.trim(),
+        level: Math.max(0, baseLevel + relativeLevel) // Ensure level doesn't go below 0
+      }
+    })
+
+    // Create new items from the processed lines
+    const newItems = processedLines.map((line, i) => ({
       id: Date.now().toString() + i,
-      text: line,
+      text: line.text,
       checked: false,
-      level: currentItem.level,
+      level: line.level,
       childItems: []
     }))
 
