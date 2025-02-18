@@ -2,21 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getListModel, ListDocument } from "@/lib/db/models-v2/list";
 import { getUserModel } from "@/lib/db/models-v2/user";
-import { withAuth, getUserId } from "@/lib/auth/api-utils";
+import { AuthServerService } from "@/lib/services/auth.server";
 
 export const dynamic = 'force-dynamic';
 
-interface RouteParams {
-  listId: string;
-}
+export async function POST(
+  request: Request,
+  { params }: { params: { listId: string } }
+) {
+  const user = await AuthServerService.getCurrentUser();
+  if (!user) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
-export const POST = withAuth<RouteParams>(async (
-  req: NextRequest,
-  { params }: { params: RouteParams }
-) => {
   try {
-    const userId = getUserId(req);
-    
     await connectToMongoDB();
     const [ListModel, UserModel] = await Promise.all([
       getListModel(),
@@ -24,36 +23,27 @@ export const POST = withAuth<RouteParams>(async (
     ]);
 
     // Get MongoDB user document
-    const mongoUser = await UserModel.findOne({ clerkId: userId });
+    const mongoUser = await UserModel.findOne({ clerkId: user.id });
     if (!mongoUser) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      return new NextResponse("User not found", { status: 404 });
     }
 
     // Find the original list
     const originalList = await ListModel.findById(params.listId).lean();
     if (!originalList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return new NextResponse("List not found", { status: 404 });
     }
 
     // Check if the list is public or if the user has access
     const hasAccess =
       originalList.visibility === "public" ||
-      originalList.owner.clerkId === userId ||
+      originalList.owner.clerkId === user.id ||
       originalList.collaborators?.some(
-        (c) => c.clerkId === userId && c.status === "accepted"
+        (c) => c.clerkId === user.id && c.status === "accepted"
       );
 
     if (!hasAccess) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return new NextResponse("Unauthorized", { status: 401 });
     }
 
     // Create a copy of the list
@@ -65,7 +55,7 @@ export const POST = withAuth<RouteParams>(async (
       listType: originalList.listType,
       items: originalList.items || [],
       owner: {
-        clerkId: userId,
+        clerkId: user.id,
         userId: mongoUser._id,
         username: mongoUser.username || "",
         joinedAt: new Date()
@@ -100,9 +90,6 @@ export const POST = withAuth<RouteParams>(async (
     return NextResponse.json(responseList);
   } catch (error) {
     console.error("Error copying list:", error);
-    return NextResponse.json(
-      { error: "Failed to copy list" },
-      { status: 500 }
-    );
+    return new NextResponse("Failed to copy list", { status: 500 });
   }
-}, { requireAuth: true }); 
+} 

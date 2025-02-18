@@ -93,7 +93,7 @@ export default function ListActionBar({
 
       const data = await response.json();
       toast.success("List copied successfully");
-      router.push(`/profile/lists/edit/${data.list.id}`);
+      router.push(`/profile/lists/edit/${data.id}`);
     } catch (error) {
       console.error("Failed to copy list:", error);
       toast.error(error instanceof Error ? error.message : "Failed to copy list");
