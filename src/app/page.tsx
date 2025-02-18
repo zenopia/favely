@@ -21,7 +21,7 @@ interface PageProps {
 export default async function HomePage({ searchParams }: PageProps) {
   // Build filter
   const filter: FilterQuery<MongoListDocument> = {
-    privacy: 'public',
+    visibility: 'public',
     ...(searchParams.q ? {
       $text: { $search: searchParams.q }
     } : {}),

@@ -115,10 +115,10 @@ export function ItemView({
                 category={list.category}
                 className="pointer-events-none"
               />
-              {list.privacy === 'private' && (
+              {list.visibility === 'private' && (
                 <Lock className="h-4 w-4 text-muted-foreground" />
               )}
-              {list.privacy === 'unlisted' && (
+              {list.visibility === 'unlisted' && (
                 <EyeOff className="h-4 w-4 text-muted-foreground" />
               )}
             </div>

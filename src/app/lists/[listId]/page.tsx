@@ -122,14 +122,14 @@ export default async function ListPage({ params, searchParams }: PageProps) {
     const isOwner = userId === list.owner.clerkId;
     const isCollaborator = userId ? list.collaborators?.some(c => c.clerkId === userId && c.status === 'accepted') : false;
 
-    // For private lists, check authentication and access
-    if (list.privacy === 'private') {
-      if (!userId) {
-        const currentPath = `/lists/${params.listId}`;
-        redirect(`/sign-in?fallbackRedirectUrl=${encodeURIComponent(currentPath)}`);
-      }
+    // Check if list is private and user doesn't have access
+    if (list.visibility === 'private') {
+      const hasAccess = userId && (
+        list.owner.clerkId === userId ||
+        list.collaborators?.some(c => c.clerkId === userId && c.status === 'accepted')
+      );
 
-      if (!isOwner && !isCollaborator) {
+      if (!hasAccess) {
         notFound();
       }
     }
@@ -167,8 +167,8 @@ export default async function ListPage({ params, searchParams }: PageProps) {
       title: list.title,
       description: list.description,
       category: list.category as ListCategory,
-      privacy: list.privacy,
-      listType: list.listType,
+      visibility: list.visibility,
+      listType: list.listType || 'bullet',
       items: list.items?.map(item => ({
         id: Math.random().toString(36).slice(2),
         title: wrapUrlsInAnchors(item.title),

@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
-import { getUserModel } from "@/lib/db/models-v2/user";
 import { getListModel } from "@/lib/db/models-v2/list";
-import type { UserDocument } from "@/lib/db/models-v2/user";
-import type { ListDocument } from "@/lib/db/models-v2/list";
+import { getUserModel } from "@/lib/db/models-v2/user";
+import { FilterQuery } from "mongoose";
+import { MongoListDocument } from "@/types/mongo";
 import { withAuth, getUserId } from "@/lib/auth/api-utils";
 
 export const dynamic = 'force-dynamic';
 
-// Search is public but can return more results when authenticated
-export const GET = withAuth(async (req: NextRequest) => {
+type RouteParams = Record<string, never>;
+
+export const GET = withAuth<RouteParams>(async (req: NextRequest) => {
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q") || "";
@@ -27,12 +28,59 @@ export const GET = withAuth(async (req: NextRequest) => {
     }
 
     await connectToMongoDB();
-    const UserModel = await getUserModel();
-    const ListModel = await getListModel();
+    const [ListModel, UserModel] = await Promise.all([
+      getListModel(),
+      getUserModel()
+    ]);
 
-    let users: Partial<UserDocument>[] = [];
-    let lists: Partial<ListDocument>[] = [];
+    let lists: any[] = [];
+    let users: any[] = [];
     let total = 0;
+
+    if (type === "lists" || type === "all") {
+      const searchQuery: FilterQuery<MongoListDocument> = {
+        $and: [
+          {
+            $or: [
+              { title: { $regex: query, $options: "i" } },
+              { description: { $regex: query, $options: "i" } }
+            ]
+          }
+        ]
+      };
+
+      // If not authenticated, only show public lists
+      if (!userId) {
+        (searchQuery.$and as any[]).push({
+          visibility: "public"
+        });
+      } else {
+        // If authenticated, show public lists and lists where user is owner/collaborator
+        (searchQuery.$and as any[]).push({
+          $or: [
+            { visibility: "public" },
+            { "owner.clerkId": userId },
+            {
+              collaborators: {
+                $elemMatch: {
+                  clerkId: userId,
+                  status: "accepted"
+                }
+              }
+            }
+          ]
+        });
+      }
+
+      [lists, total] = await Promise.all([
+        ListModel.find(searchQuery)
+          .select("title description category visibility owner stats")
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        ListModel.countDocuments(searchQuery)
+      ]);
+    }
 
     if (type === "users" || type === "all") {
       const userQuery = {
@@ -44,7 +92,7 @@ export const GET = withAuth(async (req: NextRequest) => {
 
       [users, total] = await Promise.all([
         UserModel.find(userQuery)
-          .select("username displayName bio imageUrl followersCount followingCount")
+          .select("username displayName imageUrl")
           .skip(skip)
           .limit(limit)
           .lean(),
@@ -52,55 +100,17 @@ export const GET = withAuth(async (req: NextRequest) => {
       ]);
     }
 
-    if (type === "lists" || type === "all") {
-      const listQuery = {
-        $and: [
-          {
-            $or: [
-              { title: { $regex: query, $options: "i" } },
-              { description: { $regex: query, $options: "i" } }
-            ]
-          },
-          {
-            $or: [
-              { privacy: "public" },
-              ...(userId
-                ? [
-                    { "owner.clerkId": userId },
-                    {
-                      collaborators: {
-                        $elemMatch: {
-                          clerkId: userId,
-                          status: "accepted"
-                        }
-                      }
-                    }
-                  ]
-                : [])
-            ]
-          }
-        ]
-      };
-
-      [lists, total] = await Promise.all([
-        ListModel.find(listQuery)
-          .select("title description category privacy owner stats")
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        ListModel.countDocuments(listQuery)
-      ]);
-    }
-
     return NextResponse.json({
-      users: type === "lists" ? [] : users,
-      lists: type === "users" ? [] : lists,
+      results: type === "users" ? users : type === "lists" ? lists : [...lists, ...users],
       total,
       page,
-      pageSize: limit
+      limit
     });
   } catch (error) {
-    console.error("Error searching:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    console.error("Error in search:", error);
+    return NextResponse.json(
+      { error: "Failed to search" },
+      { status: 500 }
+    );
   }
 }, { requireAuth: false }); 

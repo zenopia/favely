@@ -47,7 +47,7 @@ export async function GET(
     }
 
     // Check if the list is accessible
-    const hasAccess = list.privacy === "public" ||
+    const hasAccess = list.visibility === "public" ||
       (user && (
         list.owner.clerkId === user.id ||
         list.collaborators?.some(c => c.clerkId === user.id && c.status === "accepted")
@@ -68,7 +68,7 @@ export async function GET(
     const { lists } = await getEnhancedLists({
       _id: listId,
       $or: [
-        { privacy: "public" },
+        { visibility: "public" },
         ...(user
           ? [
               { "owner.clerkId": user.id },
@@ -100,106 +100,75 @@ export async function PUT(
   request: Request,
   { params }: { params: { listId: string } }
 ) {
-  try {
-    const currentUser = await AuthServerService.getCurrentUser();
-    if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const user = await AuthServerService.getCurrentUser();
+  if (!user) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
 
+  try {
     const { listId } = params;
     const data = await request.json();
-    const { title, description, category, privacy, items, listType } = data;
+    const { title, description, category, visibility, items, listType } = data;
 
     await connectToMongoDB();
     const ListModel = await getListModel();
-    const UserModel = await getUserModel();
 
-    const list = await ListModel.findById(listId).lean();
-
+    // Get the list to check ownership
+    const list = await ListModel.findById(listId);
     if (!list) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+      return new NextResponse("List not found", { status: 404 });
     }
 
-    // Check edit permissions
-    if (!await canEditList(list, currentUser.id)) {
-      return NextResponse.json(
-        { error: "Not authorized to edit this list" },
-        { status: 403 }
-      );
+    // Check if user can edit the list
+    const canEdit = await canEditList(list, user.id);
+    if (!canEdit) {
+      return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get user for username
-    const ownerUser = await UserModel.findOne({ clerkId: list.owner.clerkId }).lean();
-    if (!ownerUser) {
-      return NextResponse.json(
-        { error: "List owner not found" },
-        { status: 404 }
-      );
-    }
+    // Process items before updating
+    const processedItems = items.map((item: ListItem) => {
+      const properties = Array.isArray(item.properties)
+        ? item.properties.map(prop => ({
+            tag: prop.tag || undefined,
+            value: prop.value
+          }))
+        : [];
 
-    // Process items to ensure they have valid structure
-    const processedItems = items.map((item: ListItem, index: number) => ({
-      title: item.title,
-      completed: item.completed || false,
-      properties: (item.properties || []).map(prop => ({
-        tag: prop.tag,
-        value: prop.value
-      }))
-    }));
+      return {
+        title: item.title,
+        comment: item.comment,
+        completed: item.completed || false,
+        properties
+      };
+    });
 
-    // Update list
+    // Update the list
     const updatedList = await ListModel.findByIdAndUpdate(
-      params.listId,
+      listId,
       {
-        title,
-        description,
-        category,
-        privacy,
-        listType,
-        items: processedItems,
-        editedAt: new Date()
+        $set: {
+          title,
+          description,
+          category,
+          visibility,
+          listType,
+          items: processedItems,
+          editedAt: new Date()
+        }
       },
-      { 
-        new: true
-      }
-    ).lean();
+      { new: true }
+    );
 
-    if (!updatedList) {
-      return NextResponse.json(
-        { error: "List not found" },
-        { status: 404 }
-      );
+    // Get enhanced list data
+    const { lists } = await getEnhancedLists({ _id: listId });
+    if (lists.length === 0) {
+      return new NextResponse("List not found", { status: 404 });
     }
 
-    // Convert _id to string for the response
-    const { _id, ...rest } = updatedList;
-    const responseList = {
-      ...rest,
-      id: _id.toString(),
-      username: ownerUser.username,
-      createdAt: updatedList.createdAt?.toISOString(),
-      updatedAt: updatedList.updatedAt?.toISOString(),
-      editedAt: updatedList.editedAt?.toISOString(),
-      owner: {
-        ...updatedList.owner,
-        id: updatedList.owner.userId?.toString()
-      },
-      collaborators: updatedList.collaborators?.map((c: { _id?: { toString(): string } } & Record<string, unknown>) => ({
-        ...c,
-        id: c._id?.toString()
-      }))
-    };
-
-    return NextResponse.json(responseList);
+    return NextResponse.json({ list: lists[0] });
   } catch (error) {
-    console.error('Error updating list:', error);
-    return NextResponse.json(
-      { error: "Failed to update list" },
-      { status: 500 }
-    );
+    console.error("Error updating list:", error);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
 
@@ -250,44 +219,60 @@ export async function PATCH(
   try {
     const { listId } = params;
     const body = await request.json();
-    const { title, description, category, privacy, items } = body;
+    const { title, description, category, visibility, items } = body;
 
     await connectToMongoDB();
     const ListModel = await getListModel();
 
-    // Find the list and check permissions
+    // Get the list to check ownership
     const list = await ListModel.findById(listId);
     if (!list) {
       return new NextResponse("List not found", { status: 404 });
     }
 
-    // Check if user is owner or collaborator with edit permissions
-    const isOwner = list.owner.clerkId === user.id;
-    const isEditor = list.collaborators?.some(
-      (c) => c.clerkId === user.id && c.status === "accepted" && c.role === "editor"
-    );
-
-    if (!isOwner && !isEditor) {
+    // Check if user can edit the list
+    const canEdit = await canEditList(list, user.id);
+    if (!canEdit) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Update the list
-    const updatedList = await ListModel.findByIdAndUpdate(
-      listId,
-      {
-        $set: {
-          title,
-          description,
-          category,
-          privacy,
-          items,
-          editedAt: new Date()
-        }
-      },
-      { new: true }
-    ).lean();
+    // Build update object with only provided fields
+    const updateData: any = {
+      editedAt: new Date()
+    };
 
-    return NextResponse.json({ list: updatedList });
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (category !== undefined) updateData.category = category;
+    if (visibility !== undefined) updateData.visibility = visibility;
+    if (items !== undefined) {
+      updateData.items = items.map((item: ListItem) => {
+        const properties = Array.isArray(item.properties)
+          ? item.properties.map(prop => ({
+              tag: prop.tag || undefined,
+              value: prop.value
+            }))
+          : [];
+
+        return {
+          title: item.title,
+          comment: item.comment,
+          completed: item.completed || false,
+          properties
+        };
+      });
+    }
+
+    // Update the list
+    await ListModel.findByIdAndUpdate(listId, { $set: updateData });
+
+    // Get enhanced list data
+    const { lists } = await getEnhancedLists({ _id: listId });
+    if (lists.length === 0) {
+      return new NextResponse("List not found", { status: 404 });
+    }
+
+    return NextResponse.json({ list: lists[0] });
   } catch (error) {
     console.error("Error updating list:", error);
     return new NextResponse("Internal Server Error", { status: 500 });

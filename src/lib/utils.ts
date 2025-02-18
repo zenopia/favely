@@ -19,7 +19,7 @@ export function serializeList(list: MongoListDocument): List {
     title: list.title,
     description: list.description,
     category: list.category as ListCategory,
-    privacy: list.privacy,
+    visibility: list.visibility,
     listType: list.listType || 'ordered',
     owner: {
       id: list.owner.userId.toString(),

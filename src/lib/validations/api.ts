@@ -12,7 +12,7 @@ export const listCreateSchema = z.object({
   title: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   category: z.string(),
-  visibility: z.enum(['public', 'private']),
+  visibility: z.enum(['public', 'private', 'unlisted']),
   items: z.array(z.object({
     title: z.string().min(1).max(100),
     comment: z.string().max(500).optional(),

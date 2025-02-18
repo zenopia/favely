@@ -51,17 +51,17 @@ export async function removeListCollaborator(listId: string, collaboratorId: str
   return response.json();
 }
 
-// Update list privacy
-export async function updateListPrivacy(listId: string, privacy: 'public' | 'private') {
+// Update list visibility
+export async function updateListVisibility(listId: string, visibility: 'public' | 'private' | 'unlisted') {
   const response = await fetch(`/api/lists/${listId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ privacy }),
+    body: JSON.stringify({ visibility }),
   });
   if (!response.ok) {
-    throw new Error('Failed to update list privacy');
+    throw new Error('Failed to update list visibility');
   }
   return response.json();
 } 

@@ -107,10 +107,10 @@ export function ListView({
           <CollaboratorManagement
             listId={list.id}
             isOwner={isOwner}
-            privacy={list.privacy}
+            visibility={list.visibility}
             onClose={onCollaboratorsClick}
-            onPrivacyChange={(newPrivacy) => {
-              list.privacy = newPrivacy;
+            onVisibilityChange={(newVisibility) => {
+              list.visibility = newVisibility;
             }}
             currentUserRole={user ? list.collaborators?.find(c => c.clerkId === user.id)?.role : undefined}
             owner={{
@@ -142,12 +142,12 @@ export function ListView({
                 <p className="text-muted-foreground whitespace-pre-wrap">{list.description}</p>
               )}
             </div>
-            <div key="category-privacy" className="flex items-center gap-2">
+            <div key="category-visibility" className="flex items-center gap-2">
               <CategoryBadge category={list.category} />
-              {list.privacy === 'private' && (
+              {list.visibility === 'private' && (
                 <Lock className="h-4 w-4 text-muted-foreground" />
               )}
-              {list.privacy === 'unlisted' && (
+              {list.visibility === 'unlisted' && (
                 <EyeOff className="h-4 w-4 text-muted-foreground" />
               )}
             </div>

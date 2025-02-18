@@ -6,7 +6,7 @@ export interface MongoListDocument {
   title: string;
   description?: string;
   category: string;
-  visibility: 'public' | 'private';
+  visibility: 'public' | 'private' | 'unlisted';
   listType: 'ordered' | 'bullet';
   owner: {
     userId: Types.ObjectId;
@@ -82,4 +82,13 @@ export interface MongoPinDocument {
   listId: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface MongoListFilter {
+  'owner.clerkId'?: string;
+  'owner.userId'?: string;
+  'collaborators.userId'?: string;
+  'collaborators.clerkId'?: string;
+  category?: ListCategory;
+  visibility?: 'public' | 'private' | 'unlisted';
 } 

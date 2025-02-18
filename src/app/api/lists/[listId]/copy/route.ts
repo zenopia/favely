@@ -43,7 +43,7 @@ export const POST = withAuth<RouteParams>(async (
 
     // Check if the list is public or if the user has access
     const hasAccess =
-      originalList.privacy === "public" ||
+      originalList.visibility === "public" ||
       originalList.owner.clerkId === userId ||
       originalList.collaborators?.some(
         (c) => c.clerkId === userId && c.status === "accepted"
@@ -61,7 +61,7 @@ export const POST = withAuth<RouteParams>(async (
       title: `${originalList.title} (Copy)`,
       description: originalList.description,
       category: originalList.category,
-      privacy: "private", // Always create copies as private
+      visibility: "private", // Always create copies as private
       listType: originalList.listType,
       items: originalList.items || [],
       owner: {

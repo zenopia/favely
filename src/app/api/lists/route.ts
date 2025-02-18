@@ -69,9 +69,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('Received request body:', JSON.stringify(body, null, 2));
     
-    const { title, description, category, privacy, items, listType = 'ordered' } = body;
+    const { title, description, category, visibility, items, listType = 'ordered' } = body;
 
-    if (!title || !category || !privacy) {
+    if (!title || !category || !visibility) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
       title,
       description,
       category,
-      privacy,
+      visibility,
       listType,
       items: processedItems.map(item => ({
         title: item.title,

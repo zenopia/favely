@@ -12,6 +12,8 @@ import { getEnhancedLists } from "@/lib/actions/lists";
 import type { ListCategory } from "@/types/list";
 import { AuthService } from "@/lib/services/auth.service";
 import { AuthServerService } from "@/lib/services/auth.server";
+import { FilterQuery } from "mongoose";
+import type { MongoListDocument } from "@/types/mongo";
 
 interface PageProps {
   params: {
@@ -60,12 +62,9 @@ export default async function UserPage({ params, searchParams }: PageProps) {
     const userProfile = await UserProfileModel.findOne({ userId: mongoUser._id }).lean();
 
     // Build filter for lists
-    const filter = { 
-      $or: [
-        { 'owner.clerkId': profileUser.id },
-        { 'owner.userId': mongoUser._id }
-      ],
-      privacy: 'public',
+    const filter: FilterQuery<MongoListDocument> = {
+      'owner.clerkId': profileUser.id,
+      ...(currentUserId === profileUser.id ? {} : { visibility: 'public' }),
       ...(searchParams.category ? { category: searchParams.category } : {})
     };
 
