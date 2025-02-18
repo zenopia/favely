@@ -6,7 +6,7 @@ import { getUserModel } from "@/lib/db/models-v2/user";
 import { getPinModel } from "@/lib/db/models-v2/pin";
 import { getListViewModel } from "@/lib/db/models-v2/list-view";
 import { connectToMongoDB } from "@/lib/db/client";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import type { EnhancedList, ListCategory } from "@/types/list";
 import { ListPageContent } from "./list-page-content";
 import { Metadata } from "next";

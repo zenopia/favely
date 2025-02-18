@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { connectToMongoDB } from "@/lib/db/client";
 import { getListModel, ListDocument, ListCollaborator } from "@/lib/db/models-v2/list";
 import { getEnhancedLists } from "@/lib/actions/lists";
-import { getUserModel } from "@/lib/db/models-v2/user";
 import { AuthServerService } from "@/lib/services/auth.server";
 
 interface ListItem {
@@ -143,7 +142,7 @@ export async function PUT(
     });
 
     // Update the list
-    const updatedList = await ListModel.findByIdAndUpdate(
+    await ListModel.findByIdAndUpdate(
       listId,
       {
         $set: {
@@ -237,7 +236,7 @@ export async function PATCH(
     }
 
     // Build update object with only provided fields
-    const updateData: any = {
+    const updateData: Partial<Pick<ListDocument, 'title' | 'description' | 'category' | 'visibility' | 'items' | 'editedAt'>> = {
       editedAt: new Date()
     };
 
@@ -246,21 +245,17 @@ export async function PATCH(
     if (category !== undefined) updateData.category = category;
     if (visibility !== undefined) updateData.visibility = visibility;
     if (items !== undefined) {
-      updateData.items = items.map((item: ListItem) => {
-        const properties = Array.isArray(item.properties)
+      updateData.items = items.map((item: ListItem) => ({
+        title: item.title,
+        comment: item.comment,
+        completed: item.completed || false,
+        properties: Array.isArray(item.properties)
           ? item.properties.map(prop => ({
               tag: prop.tag || undefined,
               value: prop.value
             }))
-          : [];
-
-        return {
-          title: item.title,
-          comment: item.comment,
-          completed: item.completed || false,
-          properties
-        };
-      });
+          : []
+      }));
     }
 
     // Update the list
