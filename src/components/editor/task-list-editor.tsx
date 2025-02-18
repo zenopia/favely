@@ -279,61 +279,39 @@ export function TaskListEditor({
 
   // Add this function at the top level of the component
   const prepareItemsForSave = (items: TaskItem[]): SavedTaskItem[] => {
-    console.log('Starting prepareItemsForSave with items:', JSON.stringify(items, null, 2));
-    
     // Create a deep copy to avoid mutating the original items
-    const itemsCopy: TaskItem[] = JSON.parse(JSON.stringify(items))
+    const itemsCopy: TaskItem[] = JSON.parse(JSON.stringify(items));
+    const result: SavedTaskItem[] = [];
     
-    // Process each item to ensure child items are properly represented
+    // Process each parent item (level 0)
     itemsCopy.forEach((item, index) => {
-      if (item.level > 0) {
-        console.log('Processing level > 0 item:', JSON.stringify(item, null, 2));
-        // Find the parent item (first item before this one with level - 1)
-        const parentIndex = itemsCopy.slice(0, index).reverse()
-          .findIndex(parentItem => parentItem.level === item.level - 1)
-        
-        if (parentIndex !== -1) {
-          const actualParentIndex = index - 1 - parentIndex
-          const parentItem = itemsCopy[actualParentIndex]
-          console.log('Found parent item:', JSON.stringify(parentItem, null, 2));
-          
-          // Create or update the child item
-          const childItem = {
-            title: item.text,
-            tag: item.tag
-          }
-          
-          // Add to parent's childItems if not already there
-          if (!parentItem.childItems) {
-            parentItem.childItems = []
-          }
-          const existingChildIndex = parentItem.childItems.findIndex(
-            p => p.title === item.text
-          )
-          if (existingChildIndex === -1) {
-            parentItem.childItems.push(childItem)
-          } else {
-            parentItem.childItems[existingChildIndex] = childItem
-          }
+      if (item.level === 0) {
+        // Initialize the parent item
+        const parentItem: SavedTaskItem = {
+          id: item.id,
+          title: item.text,
+          checked: item.checked,
+          tag: item.tag,
+          childItems: []
+        };
+
+        // Find all child items that belong to this parent
+        let childIndex = index + 1;
+        while (childIndex < itemsCopy.length && itemsCopy[childIndex].level > 0) {
+          const childItem = itemsCopy[childIndex];
+          parentItem.childItems?.push({
+            title: childItem.text,
+            tag: childItem.tag
+          });
+          childIndex++;
         }
+
+        result.push(parentItem);
       }
-    })
+    });
     
-    // Remove items that are children (level > 0) as they should only exist in childItems
-    const result = itemsCopy.filter((item: TaskItem) => item.level === 0).map((item: TaskItem) => {
-      // Map to SavedTaskItem format
-      const savedItem: SavedTaskItem = {
-        id: item.id,
-        title: item.text,
-        checked: item.checked,
-        tag: item.tag,
-        childItems: item.childItems || []
-      }
-      return savedItem
-    })
-    
-    return result
-  }
+    return result;
+  };
 
   // Update items and notify parent
   const updateItems = (newItems: TaskItem[]) => {
