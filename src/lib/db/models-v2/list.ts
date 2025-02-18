@@ -19,7 +19,6 @@ export interface ListCollaborator {
 }
 
 interface ListItem {
-  id: string;
   title: string;
   comment?: string;
   completed?: boolean;
@@ -50,7 +49,6 @@ export interface ListDocument extends Document {
 
 // Define sub-schemas first
 const ListItemSchema = new Schema({
-  id: { type: String, required: true },
   title: { type: String, required: true },
   comment: { type: String },
   completed: { type: Boolean, default: false },

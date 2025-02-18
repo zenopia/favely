@@ -245,28 +245,26 @@ const convertSavedToEditorItems = (savedItems: SavedTaskItem[]): TaskItem[] => {
   return result;
 };
 
-// Add this function at the top level of the component
+// Prepare items for save
 const prepareItemsForSave = (items: TaskItem[]): SavedTaskItem[] => {
-  // Create a deep copy to avoid mutating the original items
-  const itemsCopy: TaskItem[] = JSON.parse(JSON.stringify(items));
   const result: SavedTaskItem[] = [];
   
   // Process each parent item (level 0)
-  itemsCopy.forEach((item, index) => {
+  items.forEach((item, index) => {
     if (item.level === 0 && item.text.trim()) {  // Only include items with text
-      // Initialize the parent item
+      // Initialize the parent item, explicitly copying all fields
       const parentItem: SavedTaskItem = {
-        id: item.id || Date.now().toString() + Math.random(),
+        id: item.id,
         title: item.text,
-        checked: item.checked,
+        checked: Boolean(item.checked), // Ensure boolean type
         tag: item.tag,
         childItems: []
       };
 
       // Find all child items that belong to this parent
       let childIndex = index + 1;
-      while (childIndex < itemsCopy.length && itemsCopy[childIndex].level > 0) {
-        const childItem = itemsCopy[childIndex];
+      while (childIndex < items.length && items[childIndex].level > 0) {
+        const childItem = items[childIndex];
         if (childItem.text.trim()) {  // Only include child items with text
           parentItem.childItems?.push({
             title: childItem.text,
@@ -379,10 +377,16 @@ export function TaskListEditor({
 
   // Handle checkbox changes
   const handleCheckChange = (id: string, checked: boolean) => {
-    const newItems = items.map(item =>
-      item.id === id ? { ...item, checked } : item
-    )
-    updateItems(newItems)
+    const index = items.findIndex(item => item.id === id)
+    const currentItem = items[index]
+
+    // Only allow checking parent items (level 0)
+    if (currentItem.level === 0) {
+      const updatedItems = items.map(item =>
+        item.id === id ? { ...item, checked } : item
+      )
+      updateItems(updatedItems)
+    }
   }
 
   // Handle indentation
@@ -534,7 +538,7 @@ export function TaskListEditor({
     const newItems = processedLines.map((line, i) => ({
       id: Date.now().toString() + i,
       text: line.text,
-      checked: false,
+      checked: i === 0 ? currentItem.checked : false, // Preserve checked status for first item
       level: line.level,
       childItems: []
     }))

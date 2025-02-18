@@ -9,6 +9,7 @@ interface ListItem {
   title: string;
   comment?: string;
   completed?: boolean;
+  checked?: boolean;
   childItems?: Array<{
     title: string;
     tag?: string;
@@ -149,7 +150,7 @@ export async function PUT(
       id: item.id,
       title: item.title,
       comment: item.comment,
-      completed: item.completed || false,
+      completed: item.checked ?? item.completed ?? false,
       index: index, // Add index to preserve order
       childItems: Array.isArray(item.childItems)
         ? item.childItems.map((child, childIndex) => ({

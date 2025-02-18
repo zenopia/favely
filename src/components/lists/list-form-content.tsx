@@ -10,6 +10,7 @@ import * as z from "zod";
 import { Loader2, Globe, Lock, EyeOff } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { updateList } from "@/lib/actions/list";
 
 import {
   Form,
@@ -101,7 +102,6 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [taskItems, setTaskItems] = useState<SavedTaskItem[]>(() => {
     if (defaultValues?.items) {
-      console.log('Initializing taskItems with:', JSON.stringify(defaultValues.items, null, 2));
       return defaultValues.items.map(item => ({
         id: item.id,
         title: item.title,
@@ -157,26 +157,44 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         description: data.description,
         visibility: data.visibility,
         listType: 'ordered',
-        items: taskItems
+        items: taskItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          checked: item.checked,
+          childItems: item.childItems
+        }))
       };
 
-      const endpoint = mode === 'create' 
-        ? '/api/lists' 
-        : `/api/lists/${defaultValues?.id}`;
+      let result;
+      if (mode === 'create') {
+        // TODO: Implement create list server action
+        const response = await fetch('/api/lists', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
 
-      const response = await fetch(endpoint, {
-        method: mode === 'create' ? 'POST' : 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+        if (!response.ok) {
+          throw new Error('Failed to create list');
+        }
 
-      if (!response.ok) {
-        throw new Error('Failed to save list');
+        result = await response.json();
+      } else {
+        // Use the server action for updates
+        if (!defaultValues?.id) {
+          throw new Error('List ID is required for updates');
+        }
+
+        result = await updateList(defaultValues.id, {
+          title: payload.title,
+          description: payload.description,
+          category: payload.category,
+          privacy: payload.visibility,
+          items: payload.items
+        });
       }
-
-      const result = await response.json();
 
       toast.success(mode === 'create' ? "List created successfully!" : "List updated successfully!");
       router.push(returnPath || `/lists/${result.id}`);

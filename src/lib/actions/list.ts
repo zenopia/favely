@@ -54,7 +54,15 @@ export async function updateList(
     description?: string;
     category?: string;
     privacy?: string;
-    items?: any[];
+    items?: Array<{
+      id: string;
+      title: string;
+      checked: boolean;
+      childItems?: Array<{
+        title: string;
+        tag?: string;
+      }>;
+    }>;
   }
 ) {
   const user = await AuthServerService.getCurrentUser();
@@ -81,17 +89,51 @@ export async function updateList(
     throw new Error("Unauthorized");
   }
 
+  // Transform items to map checked to completed if items are being updated
+  const transformedItems = data.items?.map(({ checked, id, ...item }) => ({
+    id,
+    title: item.title,
+    completed: checked,
+    childItems: item.childItems?.map(child => ({
+      title: child.title,
+      tag: child.tag
+    }))
+  }));
+
+  // Create the update operation with explicit typing
+  const updateOperation: {
+    $set: {
+      title?: string;
+      description?: string;
+      category?: string;
+      privacy?: string;
+      items?: typeof transformedItems;
+    };
+    $currentDate: { editedAt: true };
+  } = {
+    $set: {
+      ...(data.title && { title: data.title }),
+      ...(data.description && { description: data.description }),
+      ...(data.category && { category: data.category }),
+      ...(data.privacy && { privacy: data.privacy }),
+      ...(transformedItems && { items: transformedItems })
+    },
+    $currentDate: { editedAt: true }
+  };
+
   // Update the list
   const updatedList = await ListModel.findByIdAndUpdate(
     listId,
-    {
-      $set: {
-        ...data,
-        editedAt: new Date()
-      }
-    },
-    { new: true }
+    updateOperation,
+    { 
+      new: true,
+      runValidators: true  // This ensures our schema validation runs
+    }
   ).lean();
+
+  if (!updatedList) {
+    throw new Error("Failed to update list");
+  }
 
   return updatedList;
 }
