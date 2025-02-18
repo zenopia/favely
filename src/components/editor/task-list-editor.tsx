@@ -664,38 +664,52 @@ export function TaskListEditor({
       const oldIndex = items.findIndex(item => item.id === active.id);
       const newIndex = items.findIndex(item => item.id === over.id);
       
-      // Find all child items that belong to the dragged parent
-      let childItems: TaskItem[] = [];
-      let childCount = 0;
-      
-      // If the dragged item is a parent (level 0)
-      if (draggedItem.level === 0) {
-        // Collect all consecutive child items (level > 0) after the parent
-        for (let i = oldIndex + 1; i < items.length; i++) {
-          if (items[i].level > 0) {
-            childItems.push(items[i]);
-            childCount++;
-          } else {
-            break;
+      if (oldIndex !== newIndex) {
+        let newItems: TaskItem[] = [];
+        
+        if (draggedItem.level === 0) {
+          // For parent items, move them along with their children
+          const childItems: TaskItem[] = [];
+          let childCount = 0;
+          
+          // Collect all consecutive child items after the parent
+          for (let i = oldIndex + 1; i < items.length; i++) {
+            if (items[i].level > 0) {
+              childItems.push(items[i]);
+              childCount++;
+            } else {
+              break;
+            }
+          }
+
+          // First remove the parent and children
+          const withoutMoved = [
+            ...items.slice(0, oldIndex),
+            ...items.slice(oldIndex + 1 + childCount)
+          ];
+
+          // Then insert them at the new position
+          newItems = [
+            ...withoutMoved.slice(0, newIndex),
+            draggedItem,
+            ...childItems,
+            ...withoutMoved.slice(newIndex)
+          ];
+        } else {
+          // For child items, ensure they stay under a parent
+          const overItem = items[newIndex];
+          const prevItem = newIndex > 0 ? items[newIndex - 1] : null;
+          const nextItem = newIndex < items.length - 1 ? items[newIndex + 1] : null;
+
+          // Only allow moving between items of the same level
+          if (overItem.level === draggedItem.level) {
+            newItems = arrayMove(items, oldIndex, newIndex);
           }
         }
-      }
 
-      // Only reorder if dropping in a different position
-      if (active.id !== over.id) {
-        // Create a new array with the items in the correct order
-        let newItems = [...items];
-        
-        // Remove the parent and its children from their original position
-        newItems.splice(oldIndex, 1 + childCount);
-        
-        // Calculate the new insertion index, accounting for the removed items
-        const adjustedNewIndex = newIndex > oldIndex ? newIndex - (1 + childCount) : newIndex;
-        
-        // Insert the parent and its children at the new position
-        newItems.splice(adjustedNewIndex, 0, draggedItem, ...childItems);
-        
-        updateItems(newItems);
+        if (newItems.length > 0) {
+          updateItems(newItems);
+        }
       }
     }
     
