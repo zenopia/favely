@@ -198,7 +198,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       }
 
       toast.success("List deleted successfully!");
-      router.push(returnPath || '/lists');
+      router.push('/profile/lists');
       router.refresh();
     } catch (error) {
       console.error('Error deleting list:', error);

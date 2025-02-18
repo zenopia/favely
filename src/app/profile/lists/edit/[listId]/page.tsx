@@ -38,7 +38,7 @@ export default async function EditListPage({ params, searchParams }: PageProps) 
       title: list.title,
       description: list.description,
       category: list.category,
-      privacy: list.privacy,
+      privacy: list.privacy as 'public' | 'private',
       listType: list.listType || 'ordered',
       items: list.items || [],
       owner: {
@@ -64,7 +64,7 @@ export default async function EditListPage({ params, searchParams }: PageProps) 
               defaultValues={formValues} 
               returnPath={searchParams.from ? 
                 (decodeURIComponent(searchParams.from).startsWith('/') ? decodeURIComponent(searchParams.from) : `/${decodeURIComponent(searchParams.from)}`)
-                : `/lists/${list.id}`}
+                : undefined}
             />
           </div>
         </div>

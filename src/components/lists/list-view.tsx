@@ -184,7 +184,7 @@ export function ListView({
                     <div className="flex-1 p-4">
                       <div className={cn(
                         "font-medium",
-                        item.completed && "text-muted-foreground line-through"
+                        item.completed && "text-muted-foreground"
                       )}>
                         <TextWithUrls text={item.title} />
                       </div>

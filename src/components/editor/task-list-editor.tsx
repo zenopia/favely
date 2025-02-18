@@ -104,7 +104,7 @@ function SortableItem({
       className={cn(
         "flex items-start gap-2 p-2 rounded group relative min-h-[48px]",
         isActive && "bg-[#f3f1ff]",
-        item.checked && "text-muted-foreground line-through",
+        item.checked && "text-muted-foreground",
         item.tag && `border-l-[var(--category-${item.tag?.replace(/\s+/g, '-')})]`
       )}
     >
