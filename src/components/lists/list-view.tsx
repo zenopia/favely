@@ -172,7 +172,7 @@ export function ListView({
                       marginBottom: '4px'
                     }}
                   >
-                    <div className="flex items-center justify-center p-4">
+                    <div className="flex items-center justify-center py-4 p-2">
                       <span className="flex items-center justify-center">
                         {item.completed ? (
                           <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -181,7 +181,7 @@ export function ListView({
                         )}
                       </span>
                     </div>
-                    <div className="flex-1 p-4">
+                    <div className="flex-1 py-4 pr-4">
                       <div className={cn(
                         "font-medium",
                         item.completed && "text-muted-foreground"
