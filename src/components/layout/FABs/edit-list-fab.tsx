@@ -18,11 +18,10 @@ export function EditListFAB({ listId }: EditListFABProps) {
   return (
     <Link 
       href={`/profile/lists/edit/${listId}?from=${encodeURIComponent(currentPath)}`}
-      className="block mb-20 sm:mb-8"
     >
       <Button 
         size="lg"
-        className="h-14 px-6 shadow-lg flex items-center gap-2 fab-button"
+        className="fixed bottom-20 right-4 z-[60] sm:bottom-8 sm:right-8 h-14 px-6 shadow-lg flex items-center gap-2 fab-button"
       >
         <Pencil className="h-5 w-5" />
         <span>Edit list</span>
