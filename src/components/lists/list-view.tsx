@@ -23,6 +23,27 @@ interface ListViewProps {
   onPinChange?: (isPinned: boolean) => void;
 }
 
+interface ChildItem {
+  title: string;
+  tag?: string;
+  value: string;
+}
+
+interface Property {
+  tag?: string;
+  value: string;
+  isChildItem?: boolean;
+  childItems?: ChildItem[];
+}
+
+interface ListItem {
+  id: string;
+  title: string;
+  comment?: string;
+  completed?: boolean;
+  properties?: Property[];
+}
+
 // Function to detect URLs in text
 function detectUrls(text: string): Array<{ url: string; index: number }> {
   const urlRegex = /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g;
@@ -160,7 +181,8 @@ export function ListView({
           </div>
           {Array.isArray(list.items) && list.items.length > 0 ? (
             <ul className="space-y-2">
-              {list.items.map((item) => {
+              {list.items.map((item: ListItem) => {
+                const isChildItem = item.properties?.some(p => p.isChildItem);
                 return (
                   <li
                     key={item.id}
@@ -172,19 +194,21 @@ export function ListView({
                       marginBottom: '4px'
                     }}
                   >
-                    <div className="flex items-center justify-center py-4 p-2">
-                      <span className="flex items-center justify-center">
-                        {item.completed ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </span>
-                    </div>
+                    {!isChildItem && (
+                      <div className="flex items-center justify-center py-4 p-2">
+                        <span className="flex items-center justify-center">
+                          {item.completed ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <Circle className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex-1 py-4 pr-4">
                       <div className={cn(
                         "font-medium",
-                        item.completed && "text-muted-foreground"
+                        item.completed && !isChildItem && "text-muted-foreground"
                       )}>
                         <TextWithUrls text={item.title} />
                       </div>
@@ -193,6 +217,37 @@ export function ListView({
                           <TextWithUrls text={item.comment} />
                         </div>
                       )}
+                      {item.properties?.map((property, index) => (
+                        <div key={index} className={cn(
+                          "mt-2",
+                          property.isChildItem && "ml-6 p-3 bg-muted rounded-lg"
+                        )}>
+                          {property.tag && (
+                            <span className="text-sm font-medium text-muted-foreground mr-2">
+                              {property.tag}:
+                            </span>
+                          )}
+                          <span className="text-sm">{property.value}</span>
+                          {property.isChildItem && property.childItems && property.childItems.length > 0 && (
+                            <ul className="mt-2 space-y-2">
+                              {property.childItems.map((childItem: ChildItem, childIndex: number) => (
+                                <li key={childIndex} className="flex items-start">
+                                  <div className="flex-1">
+                                    <div className="font-medium">
+                                      <TextWithUrls text={childItem.title} />
+                                    </div>
+                                    {childItem.tag && (
+                                      <div className="text-sm text-muted-foreground">
+                                        {childItem.tag}: {childItem.value}
+                                      </div>
+                                    )}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </li>
                 );

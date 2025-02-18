@@ -171,19 +171,16 @@ export async function getEnhancedLists(
         username: userData?.username || list.owner.username,
         joinedAt: list.owner.joinedAt?.toISOString() || new Date().toISOString()
       },
-      items: list.items?.map(item => ({
+      items: list.items?.map((item, index) => ({
         id: crypto.randomUUID(),
         title: item.title,
         comment: item.comment,
-        rank: item.rank,
         completed: item.completed || false,
-        properties: item.properties?.map(prop => ({
-          id: crypto.randomUUID(),
-          type: prop.type as 'text' | 'link',
-          tag: prop.tag,
-          value: prop.value
-        }))
-      } as ListItem)) || [],
+        childItems: item.childItems?.map(child => ({
+          title: child.title,
+          tag: child.tag
+        })) || []
+      })) || [],
       stats: list.stats || { viewCount: 0, pinCount: 0, copyCount: 0 },
       collaborators: list.collaborators?.map(collab => ({
         id: collab.userId?.toString() || crypto.randomUUID(),

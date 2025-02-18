@@ -19,12 +19,13 @@ export interface ListCollaborator {
 }
 
 interface ListItem {
+  id: string;
   title: string;
   comment?: string;
-  completed: boolean;
-  properties: Array<{
+  completed?: boolean;
+  childItems?: Array<{
+    title: string;
     tag?: string;
-    value: string;
   }>;
 }
 
@@ -48,16 +49,15 @@ export interface ListDocument extends Document {
 }
 
 // Define sub-schemas first
-const PropertySchema = new Schema({
-  tag: { type: String },
-  value: { type: String, required: true }
-}, { _id: false });
-
 const ListItemSchema = new Schema({
+  id: { type: String, required: true },
   title: { type: String, required: true },
   comment: { type: String },
   completed: { type: Boolean, default: false },
-  properties: [PropertySchema]
+  childItems: [{
+    title: { type: String, required: true },
+    tag: { type: String }
+  }]
 }, { _id: false });
 
 const OwnerSchema = new Schema({

@@ -22,19 +22,33 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
 
 interface TaskItem {
-  id: string
-  text: string
-  checked: boolean
-  children?: TaskItem[]
-  tag?: string
-  level: number
+  id: string;
+  text: string;
+  checked: boolean;
+  level: number;
+  tag?: string;
+  childItems?: Array<{
+    title: string;
+    tag?: string;
+  }>;
 }
 
+type SavedTaskItem = {
+  id: string;
+  title: string;
+  checked: boolean;
+  tag?: string;
+  childItems?: Array<{
+    title: string;
+    tag?: string;
+  }>;
+};
+
 interface TaskListEditorProps {
-  initialItems?: TaskItem[]
-  onChange?: (items: TaskItem[]) => void
-  className?: string
-  category?: string
+  initialItems?: SavedTaskItem[];
+  onChange?: (items: SavedTaskItem[]) => void;
+  className?: string;
+  category?: string;
 }
 
 interface SortableItemProps {
@@ -95,6 +109,7 @@ function SortableItem({
     boxShadow: isDragging ? 'rgba(0, 0, 0, 0.2) 0px 5px 10px' : undefined,
     zIndex: isDragging ? 50 : undefined,
     borderLeft: `4px solid var(--category-${getCategoryVar(category)})`,
+    borderRadius: '0.375rem',
   };
 
   return (
@@ -104,16 +119,19 @@ function SortableItem({
       className={cn(
         "flex items-start gap-2 p-2 rounded group relative min-h-[48px]",
         isActive && "bg-[#f3f1ff]",
-        item.checked && "text-muted-foreground",
+        item.level > 0 && "bg-muted",
+        item.checked && item.level === 0 && "text-muted-foreground",
         item.tag && `border-l-[var(--category-${item.tag?.replace(/\s+/g, '-')})]`
       )}
     >
-      <input
-        type="checkbox"
-        checked={item.checked}
-        onChange={e => onCheckChange(item.id, e.target.checked)}
-        className="cursor-pointer shrink-0 mt-1.5"
-      />
+      {item.level === 0 && (
+        <input
+          type="checkbox"
+          checked={item.checked}
+          onChange={e => onCheckChange(item.id, e.target.checked)}
+          className="cursor-pointer shrink-0 mt-1.5"
+        />
+      )}
       
       <div 
         ref={setEditableRef(item.id)}
@@ -148,6 +166,44 @@ function SortableItem({
   );
 }
 
+// Convert saved items to editor items
+const convertSavedToEditorItems = (savedItems: SavedTaskItem[]): TaskItem[] => {
+  console.log('Converting saved items:', JSON.stringify(savedItems, null, 2));
+  const result: TaskItem[] = [];
+  
+  savedItems.forEach(item => {
+    // Add parent item
+    const parentItem = {
+      id: item.id,
+      text: item.title,
+      checked: item.checked,
+      level: 0,
+      tag: item.tag
+    };
+    result.push(parentItem);
+    
+    // Add child items if any, maintaining their order
+    if (item.childItems?.length) {
+      let insertIndex = result.length;
+      item.childItems.forEach(child => {
+        const childItem = {
+          id: Date.now().toString() + Math.random(),
+          text: child.title,
+          checked: false,
+          level: 1,
+          tag: child.tag
+        };
+        // Insert child item at the current insert index and increment it
+        result.splice(insertIndex, 0, childItem);
+        insertIndex++;
+      });
+    }
+  });
+  
+  console.log('Final converted items:', JSON.stringify(result, null, 2));
+  return result;
+};
+
 export function TaskListEditor({
   initialItems = [],
   onChange,
@@ -156,7 +212,7 @@ export function TaskListEditor({
 }: TaskListEditorProps) {
   const [items, setItems] = useState<TaskItem[]>(() => 
     initialItems.length > 0 
-      ? initialItems 
+      ? convertSavedToEditorItems(initialItems)
       : [{ id: '1', text: '', checked: false, level: 0 }]
   )
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -177,17 +233,125 @@ export function TaskListEditor({
     })
   );
 
+  // Add this function at the top level of the component
+  const prepareItemsForSave = (items: TaskItem[]): SavedTaskItem[] => {
+    console.log('Starting prepareItemsForSave with items:', JSON.stringify(items, null, 2));
+    
+    // Create a deep copy to avoid mutating the original items
+    const itemsCopy: TaskItem[] = JSON.parse(JSON.stringify(items))
+    
+    // Process each item to ensure child items are properly represented
+    itemsCopy.forEach((item, index) => {
+      if (item.level > 0) {
+        console.log('Processing level > 0 item:', JSON.stringify(item, null, 2));
+        // Find the parent item (first item before this one with level - 1)
+        const parentIndex = itemsCopy.slice(0, index).reverse()
+          .findIndex(parentItem => parentItem.level === item.level - 1)
+        
+        if (parentIndex !== -1) {
+          const actualParentIndex = index - 1 - parentIndex
+          const parentItem = itemsCopy[actualParentIndex]
+          console.log('Found parent item:', JSON.stringify(parentItem, null, 2));
+          
+          // Create or update the child item
+          const childItem = {
+            title: item.text,
+            tag: item.tag
+          }
+          
+          // Add to parent's childItems if not already there
+          if (!parentItem.childItems) {
+            parentItem.childItems = []
+          }
+          const existingChildIndex = parentItem.childItems.findIndex(
+            p => p.title === item.text
+          )
+          if (existingChildIndex === -1) {
+            parentItem.childItems.push(childItem)
+          } else {
+            parentItem.childItems[existingChildIndex] = childItem
+          }
+        }
+      }
+    })
+    
+    // Remove items that are children (level > 0) as they should only exist in childItems
+    const result = itemsCopy.filter((item: TaskItem) => item.level === 0).map((item: TaskItem) => {
+      // Map to SavedTaskItem format
+      const savedItem: SavedTaskItem = {
+        id: item.id,
+        title: item.text,
+        checked: item.checked,
+        tag: item.tag,
+        childItems: item.childItems || []
+      }
+      return savedItem
+    })
+    
+    return result
+  }
+
   // Update items and notify parent
   const updateItems = (newItems: TaskItem[]) => {
     setItems(newItems)
-    onChange?.(newItems)
+    // Only pass the parent items to onChange, with children as childItems
+    if (onChange) {
+      const itemsForSave = prepareItemsForSave(newItems)
+      onChange(itemsForSave)
+    }
   }
 
   // Handle text changes
   const handleTextChange = (id: string, text: string) => {
-    const newItems = items.map(item =>
-      item.id === id ? { ...item, text } : item
-    )
+    let newItems = items.map(item => {
+      if (item.id === id) {
+        return { ...item, text }
+      }
+      return item
+    })
+
+    // If this is a child item, also update the parent's childItems
+    const currentItem = items.find(item => item.id === id)
+    if (currentItem && currentItem.level > 0) {
+      // Find parent item
+      const parentIndex = items.findIndex((parentItem, idx) => 
+        idx < items.findIndex(i => i.id === id) && 
+        parentItem.level === (currentItem.level - 1)
+      )
+      
+      if (parentIndex !== -1) {
+        const parentItem = items[parentIndex]
+        const parentChildItems = parentItem.childItems || []
+        
+        // Find the matching child item by comparing the old text
+        const existingChildIndex = parentChildItems.findIndex(
+          p => p.title === currentItem.text
+        )
+        
+        // Create or update the child item
+        const childItem = {
+          title: text
+        }
+        
+        // Update parent item in newItems array
+        newItems = newItems.map((item, index) => {
+          if (index === parentIndex) {
+            const updatedChildItems = [...parentChildItems]
+            if (existingChildIndex !== -1) {
+              updatedChildItems[existingChildIndex] = childItem
+            } else {
+              updatedChildItems.push(childItem)
+            }
+            return {
+              ...item,
+              childItems: updatedChildItems
+            }
+          }
+          return item
+        })
+      }
+    }
+
     updateItems(newItems)
   }
 
@@ -201,26 +365,65 @@ export function TaskListEditor({
 
   // Handle indentation
   const handleIndent = (id: string) => {
-    const index = items.findIndex(item => item.id === id)
-    if (index <= 0) return // Can't indent first item
+    console.log('Handling indent for item:', id);
+    const index = items.findIndex(item => item.id === id);
+    if (index <= 0) return; // Can't indent first item
 
-    const prevItem = items[index - 1]
-    const currentItem = items[index]
+    const prevItem = items[index - 1];
+    const currentItem = items[index];
+    console.log('Previous item:', JSON.stringify(prevItem, null, 2));
+    console.log('Current item:', JSON.stringify(currentItem, null, 2));
 
-    // Can only indent one level deeper than previous item
-    if (currentItem.level <= prevItem.level) {
-      const newItems = items.map(item =>
-        item.id === id ? { ...item, level: item.level + 1 } : item
-      )
-      updateItems(newItems)
+    // Only allow indentation if:
+    // 1. Current item is at level 0
+    // 2. Previous item is at level 0
+    if (currentItem.level === 0 && prevItem.level === 0) {
+      const updatedItems = [...items];
+      
+      // Update the current item's level to 1 (max level)
+      updatedItems[index] = {
+        ...currentItem,
+        level: 1
+      };
+      
+      console.log('Updated items after indent:', JSON.stringify(updatedItems, null, 2));
+      updateItems(updatedItems);
     }
-  }
+  };
 
   const handleOutdent = (id: string) => {
-    const newItems = items.map(item =>
-      item.id === id && item.level > 0 ? { ...item, level: item.level - 1 } : item
-    )
-    updateItems(newItems)
+    const index = items.findIndex(item => item.id === id)
+    const currentItem = items[index]
+
+    if (currentItem.level > 0) {
+      // Find the parent item (the item before this one with level - 1)
+      const parentIndex = items.slice(0, index).reverse()
+        .findIndex(item => item.level === currentItem.level - 1)
+      
+      if (parentIndex !== -1) {
+        const actualParentIndex = index - 1 - parentIndex
+        const parentItem = items[actualParentIndex]
+        const updatedItems = [...items]
+
+        // Update the current item's level
+        updatedItems[index] = {
+          ...currentItem,
+          level: currentItem.level - 1
+        }
+
+        // Remove this item from parent's childItems
+        const updatedParentChildItems = (parentItem.childItems || [])
+          .filter(p => p.title !== currentItem.text)
+
+        // Update the parent item
+        updatedItems[actualParentIndex] = {
+          ...parentItem,
+          childItems: updatedParentChildItems
+        }
+
+        updateItems(updatedItems)
+      }
+    }
   }
 
   // Create a new task and focus it
@@ -231,7 +434,8 @@ export function TaskListEditor({
       id: Date.now().toString(), 
       text, 
       checked: false,
-      level: currentItem.level
+      level: currentItem.level,
+      childItems: []
     }
     const newItems = [
       ...items.slice(0, index + 1),
@@ -277,7 +481,8 @@ export function TaskListEditor({
       id: Date.now().toString() + i,
       text: line,
       checked: false,
-      level: currentItem.level
+      level: currentItem.level,
+      childItems: []
     }))
 
     // Replace the current item with the new items

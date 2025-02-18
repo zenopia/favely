@@ -74,20 +74,18 @@ export function ItemView({
 
   const handleDetailsUpdate = async (details: { title: string; comment?: string; properties?: Array<{ type?: 'text' | 'link'; tag?: string; value: string; }> }) => {
     try {
-      // Find the index of the current item in the list's items array
-      const itemIndex = (list.items || []).findIndex(i => i.id === item.id);
-      if (itemIndex === -1) {
-        throw new Error('Item not found');
-      }
+      // Update the item in the list's items array
+      const updatedItems = (list.items || []).map(i => 
+        i.id === item.id ? { ...i, ...details } : i
+      );
 
-      const response = await fetch(`/api/lists/${list.id}/items`, {
+      const response = await fetch(`/api/lists/${list.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          index: itemIndex,
-          ...details
+          items: updatedItems
         }),
       });
 

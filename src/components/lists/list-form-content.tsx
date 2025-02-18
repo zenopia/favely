@@ -30,12 +30,15 @@ import {
 } from "@/components/ui/select";
 import { TaskListEditor } from '@/components/editor/task-list-editor'
 
-interface TaskItem {
+interface SavedTaskItem {
   id: string;
-  text: string;
+  title: string;
   checked: boolean;
-  level: number;
   tag?: string;
+  childItems?: Array<{
+    title: string;
+    tag?: string;
+  }>;
 }
 
 export interface ListFormProps {
@@ -52,9 +55,9 @@ export interface ListFormProps {
       title: string;
       comment?: string;
       completed?: boolean;
-      properties?: Array<{
+      childItems?: Array<{
+        title: string;
         tag?: string;
-        value: string;
       }>;
     }>;
   };
@@ -96,14 +99,14 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [taskItems, setTaskItems] = useState<TaskItem[]>(() => {
+  const [taskItems, setTaskItems] = useState<SavedTaskItem[]>(() => {
     if (defaultValues?.items) {
+      console.log('Initializing taskItems with:', JSON.stringify(defaultValues.items, null, 2));
       return defaultValues.items.map(item => ({
         id: item.id,
-        text: item.title,
+        title: item.title,
         checked: item.completed || false,
-        level: 0,
-        tag: item.properties?.[0]?.tag
+        childItems: item.childItems || []
       }));
     }
     return [];
@@ -130,7 +133,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
     }
   }, [form, defaultValues]);
 
-  const handleTaskItemsChange = (items: TaskItem[]) => {
+  const handleTaskItemsChange = (items: SavedTaskItem[]) => {
     setTaskItems(items);
   };
 
@@ -148,19 +151,16 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
     setIsSubmitting(true);
 
     try {
-      const processedItems = taskItems.map(item => ({
-        title: item.text,
-        completed: item.checked,
-        properties: item.tag ? [{ tag: item.tag, value: item.text }] : undefined
-      }));
-
       const payload = {
         title: data.title,
         category: data.category,
         description: data.description,
         visibility: data.visibility,
-        items: processedItems
+        listType: 'ordered',
+        items: taskItems
       };
+
+      console.log('Saving payload:', JSON.stringify(payload, null, 2));
 
       const endpoint = mode === 'create' 
         ? '/api/lists' 
@@ -181,7 +181,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       const result = await response.json();
 
       toast.success(mode === 'create' ? "List created successfully!" : "List updated successfully!");
-      router.push(returnPath || `/lists/${result.id}`);
+      router.push(returnPath || `/lists/${result.list.id}`);
       router.refresh();
     } catch (error) {
       console.error('Error saving list:', error);

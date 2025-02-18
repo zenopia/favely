@@ -5,12 +5,13 @@ import { getEnhancedLists } from "@/lib/actions/lists";
 import { AuthServerService } from "@/lib/services/auth.server";
 
 interface ListItem {
+  id: string;
   title: string;
   comment?: string;
   completed?: boolean;
-  properties?: Array<{
+  childItems?: Array<{
+    title: string;
     tag?: string;
-    value: string;
   }>;
 }
 
@@ -26,6 +27,25 @@ async function canEditList(list: ListDocument, userId: string | null) {
       ['admin', 'editor'].includes(c.role)
     )
   );
+}
+
+// Add this helper function after canEditList
+async function migrateListItemSchema(list: ListDocument) {
+  // Convert old properties array to new childItems array if needed
+  if (list.items) {
+    list.items = list.items.map(item => {
+      const itemAny = item as any;
+      if (itemAny.properties) {
+        const { properties, ...rest } = itemAny;
+        return {
+          ...rest,
+          childItems: properties || []
+        };
+      }
+      return item;
+    });
+    await list.save();
+  }
 }
 
 export async function GET(
@@ -125,24 +145,21 @@ export async function PUT(
     }
 
     // Process items before updating
-    const processedItems = items.map((item: ListItem) => {
-      const properties = Array.isArray(item.properties)
-        ? item.properties.map(prop => ({
-            tag: prop.tag || undefined,
-            value: prop.value
+    const processedItems = items.map((item: ListItem) => ({
+      id: item.id,
+      title: item.title,
+      comment: item.comment,
+      completed: item.completed || false,
+      childItems: Array.isArray(item.childItems)
+        ? item.childItems.map(child => ({
+            title: child.title,
+            tag: child.tag || undefined
           }))
-        : [];
-
-      return {
-        title: item.title,
-        comment: item.comment,
-        completed: item.completed || false,
-        properties
-      };
-    });
+        : []
+    }));
 
     // Update the list
-    await ListModel.findByIdAndUpdate(
+    const updatedList = await ListModel.findByIdAndUpdate(
       listId,
       {
         $set: {
@@ -158,6 +175,11 @@ export async function PUT(
       { new: true }
     );
 
+    if (!updatedList) {
+      console.error('Failed to update list');
+      return new NextResponse("Failed to update list", { status: 500 });
+    }
+
     // Get enhanced list data
     const { lists } = await getEnhancedLists({ _id: listId });
     if (lists.length === 0) {
@@ -167,6 +189,9 @@ export async function PUT(
     return NextResponse.json({ list: lists[0] });
   } catch (error) {
     console.error("Error updating list:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", error.message, error.stack);
+    }
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
@@ -235,6 +260,9 @@ export async function PATCH(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Migrate the schema if needed
+    await migrateListItemSchema(list);
+
     // Build update object with only provided fields
     const updateData: Partial<Pick<ListDocument, 'title' | 'description' | 'category' | 'visibility' | 'items' | 'editedAt'>> = {
       editedAt: new Date()
@@ -246,13 +274,14 @@ export async function PATCH(
     if (visibility !== undefined) updateData.visibility = visibility;
     if (items !== undefined) {
       updateData.items = items.map((item: ListItem) => ({
+        id: item.id,
         title: item.title,
         comment: item.comment,
         completed: item.completed || false,
-        properties: Array.isArray(item.properties)
-          ? item.properties.map(prop => ({
-              tag: prop.tag || undefined,
-              value: prop.value
+        childItems: Array.isArray(item.childItems)
+          ? item.childItems.map(child => ({
+              title: child.title,
+              tag: child.tag || undefined
             }))
           : []
       }));

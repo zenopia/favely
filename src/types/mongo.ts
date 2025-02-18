@@ -29,10 +29,9 @@ export interface MongoListDocument {
     comment?: string;
     completed?: boolean;
     rank?: number;
-    properties?: Array<{
-      type?: string;
+    childItems?: Array<{
+      title: string;
       tag?: string;
-      value: string;
     }>;
   }>;
   stats?: {
