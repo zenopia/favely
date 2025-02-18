@@ -175,7 +175,6 @@ export default async function ListPage({ params, searchParams }: PageProps) {
         comment: item.comment ? wrapUrlsInAnchors(item.comment) : undefined,
         completed: item.completed || false,
         childItems: item.childItems?.map(prop => ({
-          id: Math.random().toString(36).slice(2),
           tag: prop.tag,
           title: prop.title
         }))

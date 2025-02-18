@@ -3,7 +3,7 @@
 import { EnhancedList } from "@/types/list";
 import { CategoryBadge } from "@/components/lists/category-badge";
 import ListActionBar from "@/components/lists/list-action-bar";
-import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff, ExternalLink, CheckCircle2, Circle } from "lucide-react";
+import { Eye, Pin, Copy, Lock, Pen, Plus, EyeOff, ExternalLink, CheckCircle2, Circle, ChevronDown, ChevronRight, List } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { EditListFAB } from "@/components/layout/FABs/edit-list-fab";
 import { UserCard } from "@/components/users/user-card";
@@ -11,6 +11,8 @@ import { ErrorBoundaryWrapper } from "@/components/error-boundary-wrapper";
 import { CollaboratorManagement } from "@/components/lists/collaborator-management";
 import { useAuthService } from "@/lib/services/auth.service";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface ListViewProps {
   list: EnhancedList;
@@ -26,7 +28,7 @@ interface ListViewProps {
 interface ChildItem {
   title: string;
   tag?: string;
-  value: string;
+  index?: number;
 }
 
 interface Property {
@@ -42,6 +44,7 @@ interface ListItem {
   comment?: string;
   completed?: boolean;
   properties?: Property[];
+  childItems?: ChildItem[];
 }
 
 // Function to detect URLs in text
@@ -116,9 +119,22 @@ export function ListView({
   onPinChange
 }: ListViewProps) {
   const { user, isSignedIn } = useAuthService();
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const handlePinChange = (newPinned: boolean) => {
     onPinChange?.(newPinned);
+  };
+
+  const toggleItem = (itemId: string) => {
+    setExpandedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -181,20 +197,30 @@ export function ListView({
           </div>
           {Array.isArray(list.items) && list.items.length > 0 ? (
             <ul className="space-y-2">
-              {list.items.map((item: ListItem) => {
+              {list.items
+                .map((item: ListItem) => {
                 const isChildItem = item.properties?.some(p => p.isChildItem);
-                return (
+                const hasChildren = item.childItems && item.childItems.length > 0;
+                const isExpanded = expandedItems.has(item.id);
+
+                return !isChildItem ? (
                   <li
                     key={item.id}
-                    className="flex items-start border-b last:border-b-0 relative"
-                    style={{
-                      borderLeft: `4px solid var(--category-${getCategoryVar(list.category)})`,
-                      borderBottom: 'none',
-                      borderRadius: '0.375rem',
-                      marginBottom: '4px'
-                    }}
+                    className="space-y-2"
                   >
-                    {!isChildItem && (
+                    <div
+                      className={cn(
+                        "flex items-start border-b last:border-b-0 relative",
+                        hasChildren && "cursor-pointer"
+                      )}
+                      onClick={() => hasChildren && toggleItem(item.id)}
+                      style={{
+                        borderLeft: `4px solid var(--category-${getCategoryVar(list.category)})`,
+                        borderBottom: 'none',
+                        borderRadius: '0.375rem',
+                        marginBottom: '4px'
+                      }}
+                    >
                       <div className="flex items-center justify-center py-4 p-2">
                         <span className="flex items-center justify-center">
                           {item.completed ? (
@@ -204,53 +230,55 @@ export function ListView({
                           )}
                         </span>
                       </div>
-                    )}
-                    <div className="flex-1 py-4 pr-4">
-                      <div className={cn(
-                        "font-medium",
-                        item.completed && !isChildItem && "text-muted-foreground"
-                      )}>
-                        <TextWithUrls text={item.title} />
+                      <div className="flex-1 py-4 pr-4">
+                        <div className={cn(
+                          "font-medium",
+                          item.completed && "text-muted-foreground"
+                        )}>
+                          <TextWithUrls text={item.title} />
+                        </div>
+                        {item.comment && (
+                          <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
+                            <TextWithUrls text={item.comment} />
+                          </div>
+                        )}
                       </div>
-                      {item.comment && (
-                        <div className="mt-1 text-sm text-muted-foreground whitespace-pre-wrap">
-                          <TextWithUrls text={item.comment} />
+                      {hasChildren && (
+                        <div className="flex items-center gap-2 py-4 pr-4 text-muted-foreground">
+                          <List className="h-4 w-4" />
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
                         </div>
                       )}
-                      {item.properties?.map((property, index) => (
-                        <div key={index} className={cn(
-                          "mt-2",
-                          property.isChildItem && "ml-6 p-3 bg-muted rounded-lg"
-                        )}>
-                          {property.tag && (
-                            <span className="text-sm font-medium text-muted-foreground mr-2">
-                              {property.tag}:
-                            </span>
-                          )}
-                          <span className="text-sm">{property.value}</span>
-                          {property.isChildItem && property.childItems && property.childItems.length > 0 && (
-                            <ul className="mt-2 space-y-2">
-                              {property.childItems.map((childItem: ChildItem, childIndex: number) => (
-                                <li key={childIndex} className="flex items-start">
-                                  <div className="flex-1">
-                                    <div className="font-medium">
-                                      <TextWithUrls text={childItem.title} />
-                                    </div>
-                                    {childItem.tag && (
-                                      <div className="text-sm text-muted-foreground">
-                                        {childItem.tag}: {childItem.value}
-                                      </div>
-                                    )}
-                                  </div>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      ))}
                     </div>
+                    {/* Render child items */}
+                    {isExpanded && hasChildren && (
+                      <ul className="ml-8 space-y-2">
+                        {(item.childItems || [])
+                          .map((childItem, childIndex) => (
+                          <li
+                            key={`${item.id}-child-${childIndex}`}
+                            className="flex items-start border-b last:border-b-0 relative bg-muted/50 rounded-lg p-2"
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium">
+                                <TextWithUrls text={childItem.title} />
+                              </div>
+                              {childItem.tag && (
+                                <div className="text-sm text-muted-foreground">
+                                  {childItem.tag}
+                                </div>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
-                );
+                ) : null;
               })}
             </ul>
           ) : (

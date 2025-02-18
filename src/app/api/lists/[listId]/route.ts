@@ -145,15 +145,17 @@ export async function PUT(
     }
 
     // Process items before updating
-    const processedItems = items.map((item: ListItem) => ({
+    const processedItems = items.map((item: ListItem, index: number) => ({
       id: item.id,
       title: item.title,
       comment: item.comment,
       completed: item.completed || false,
+      index: index, // Add index to preserve order
       childItems: Array.isArray(item.childItems)
-        ? item.childItems.map(child => ({
+        ? item.childItems.map((child, childIndex) => ({
             title: child.title,
-            tag: child.tag || undefined
+            tag: child.tag || undefined,
+            index: childIndex // Add index to preserve child order
           }))
         : []
     }));

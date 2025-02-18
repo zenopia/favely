@@ -593,7 +593,37 @@ export function TaskListEditor({
       const oldIndex = items.findIndex(item => item.id === active.id);
       const newIndex = items.findIndex(item => item.id === over.id);
       
-      updateItems(arrayMove(items, oldIndex, newIndex));
+      // Find all child items that belong to the dragged parent
+      const draggedItem = items[oldIndex];
+      let childItems: TaskItem[] = [];
+      let childCount = 0;
+      
+      // If the dragged item is a parent (level 0)
+      if (draggedItem.level === 0) {
+        // Collect all consecutive child items (level > 0) after the parent
+        for (let i = oldIndex + 1; i < items.length; i++) {
+          if (items[i].level > 0) {
+            childItems.push(items[i]);
+            childCount++;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // Create a new array with the items in the correct order
+      let newItems = [...items];
+      
+      // Remove the parent and its children from their original position
+      newItems.splice(oldIndex, 1 + childCount);
+      
+      // Calculate the new insertion index, accounting for the removed items
+      const adjustedNewIndex = newIndex > oldIndex ? newIndex - (1 + childCount) : newIndex;
+      
+      // Insert the parent and its children at the new position
+      newItems.splice(adjustedNewIndex, 0, draggedItem, ...childItems);
+      
+      updateItems(newItems);
     }
 
     // Set the dropped item as active and focus its text
