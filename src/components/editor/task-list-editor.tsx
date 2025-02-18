@@ -21,6 +21,7 @@ import {
 } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { CSS } from '@dnd-kit/utilities'
+import { IndentIcon, OutdentIcon } from 'lucide-react'
 
 interface TaskItem {
   id: string;
@@ -61,10 +62,13 @@ interface SortableItemProps {
   onCheckChange: (id: string, checked: boolean) => void
   onKeyDown: (e: React.KeyboardEvent, id: string) => void
   onPaste: (e: React.ClipboardEvent, id: string) => void
+  onIndent: (id: string) => void
+  onOutdent: (id: string) => void
   isActive: boolean
   onFocus: () => void
   onBlur: () => void
   setEditableRef: (id: string) => (el: HTMLDivElement | null) => void
+  editableRefs: React.RefObject<Map<string, HTMLDivElement>>
   category?: string
 }
 
@@ -86,10 +90,13 @@ function SortableItem({
   onCheckChange,
   onKeyDown,
   onPaste,
+  onIndent,
+  onOutdent,
   isActive,
   onFocus,
   onBlur,
   setEditableRef,
+  editableRefs,
   category,
 }: SortableItemProps) {
   const {
@@ -100,6 +107,18 @@ function SortableItem({
     transition,
     isDragging,
   } = useSortable({ id });
+
+  // Add ref for the buttons container
+  const buttonsRef = useRef<HTMLDivElement>(null);
+
+  // Modified onBlur handler that checks if we're clicking the indent/outdent buttons
+  const handleBlur = (e: React.FocusEvent) => {
+    // Check if the click was inside the buttons container
+    if (buttonsRef.current?.contains(e.relatedTarget as Node)) {
+      return; // Don't trigger blur if clicking buttons
+    }
+    onBlur();
+  };
 
   // Find child items if this is a parent item
   const isParent = item.level === 0;
@@ -167,7 +186,7 @@ function SortableItem({
           suppressContentEditableWarning
           data-placeholder="Type your task here..."
           onFocus={onFocus}
-          onBlur={onBlur}
+          onBlur={handleBlur}
           onInput={e => onTextChange(item.id, e.currentTarget.textContent || '')}
           onKeyDown={e => onKeyDown(e, item.id)}
           onPaste={e => onPaste(e, item.id)}
@@ -177,6 +196,49 @@ function SortableItem({
             !item.text && 'empty:before:content-[attr(data-placeholder)]'
           )}
         />
+
+        {/* Indent/Outdent buttons - only show when item is active */}
+        {isActive && (
+          <div ref={buttonsRef} className="flex items-center gap-1">
+            {item.level > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onOutdent(id);
+                  // Refocus the editable div after the operation
+                  const element = editableRefs.current?.get(id);
+                  if (element) {
+                    element.focus();
+                  }
+                }}
+                className="p-1 hover:bg-muted rounded-sm transition-colors"
+                title="Outdent"
+                tabIndex={-1} // Prevent button from receiving focus
+              >
+                <OutdentIcon className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onIndent(id);
+                  // Refocus the editable div after the operation
+                  const element = editableRefs.current?.get(id);
+                  if (element) {
+                    element.focus();
+                  }
+                }}
+                className="p-1 hover:bg-muted rounded-sm transition-colors"
+                title="Indent"
+                tabIndex={-1} // Prevent button from receiving focus
+              >
+                <IndentIcon className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div
           {...attributes}
@@ -770,6 +832,8 @@ export function TaskListEditor({
                   onCheckChange={handleCheckChange}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
+                  onIndent={handleIndent}
+                  onOutdent={handleOutdent}
                   isActive={activeId === item.id}
                   onFocus={() => {
                     setActiveId(item.id)
@@ -780,6 +844,7 @@ export function TaskListEditor({
                   }}
                   onBlur={() => setActiveId(null)}
                   setEditableRef={setEditableRef}
+                  editableRefs={editableRefs}
                   category={category}
                 />
               );
