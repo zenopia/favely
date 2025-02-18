@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -54,6 +55,8 @@ interface TaskListEditorProps {
 interface SortableItemProps {
   id: string
   item: TaskItem
+  items: TaskItem[]
+  parentIsDragging?: boolean
   onTextChange: (id: string, text: string) => void
   onCheckChange: (id: string, checked: boolean) => void
   onKeyDown: (e: React.KeyboardEvent, id: string) => void
@@ -77,6 +80,8 @@ const getCategoryVar = (category?: string) => {
 function SortableItem({
   id,
   item,
+  items,
+  parentIsDragging,
   onTextChange,
   onCheckChange,
   onKeyDown,
@@ -95,6 +100,20 @@ function SortableItem({
     transition,
     isDragging,
   } = useSortable({ id });
+
+  // Find child items if this is a parent item
+  const isParent = item.level === 0;
+  const childItems = isParent && isDragging ? items.filter((childItem: TaskItem, index: number) => {
+    const parentIndex = items.findIndex((i: TaskItem) => i.id === id);
+    return childItem.level > 0 && 
+           index > parentIndex && 
+           items.slice(parentIndex + 1, index).every((i: TaskItem) => i.level > 0);
+  }) : [];
+
+  // If this item is a child and its parent is being dragged, don't render it
+  if (parentIsDragging) {
+    return null;
+  }
 
   const style = {
     transform: CSS.Transform.toString(transform && {
@@ -117,51 +136,75 @@ function SortableItem({
       ref={setNodeRef}
       style={style}
       className={cn(
+        "relative",
+        isDragging && "opacity-100"
+      )}
+    >
+      <div className={cn(
         "flex items-start gap-2 p-2 rounded group relative min-h-[48px]",
         isActive && "bg-[#f3f1ff]",
         item.level > 0 && "bg-muted",
         item.checked && item.level === 0 && "text-muted-foreground",
         item.tag && `border-l-[var(--category-${item.tag?.replace(/\s+/g, '-')})]`
-      )}
-    >
-      {item.level === 0 && (
-        <input
-          type="checkbox"
-          checked={item.checked}
-          onChange={e => onCheckChange(item.id, e.target.checked)}
-          className="cursor-pointer shrink-0 mt-1.5"
+      )}>
+        {item.level === 0 && (
+          <input
+            type="checkbox"
+            checked={item.checked}
+            onChange={e => onCheckChange(item.id, e.target.checked)}
+            className="cursor-pointer shrink-0 mt-1.5"
+          />
+        )}
+        
+        <div 
+          ref={setEditableRef(item.id)}
+          contentEditable
+          suppressContentEditableWarning
+          data-placeholder="Type your task here..."
+          onFocus={onFocus}
+          onBlur={onBlur}
+          onInput={e => onTextChange(item.id, e.currentTarget.textContent || '')}
+          onKeyDown={e => onKeyDown(e, item.id)}
+          onPaste={e => onPaste(e, item.id)}
+          className={cn(
+            "flex-1 outline-none min-h-[1.5em] px-1 whitespace-pre-wrap break-words",
+            "before:text-muted-foreground before:pointer-events-none",
+            !item.text && 'empty:before:content-[attr(data-placeholder)]'
+          )}
         />
-      )}
-      
-      <div 
-        ref={setEditableRef(item.id)}
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder="Type your task here..."
-        onFocus={onFocus}
-        onBlur={onBlur}
-        onInput={e => onTextChange(item.id, e.currentTarget.textContent || '')}
-        onKeyDown={e => onKeyDown(e, item.id)}
-        onPaste={e => onPaste(e, item.id)}
-        className={cn(
-          "flex-1 outline-none min-h-[1.5em] px-1 whitespace-pre-wrap break-words",
-          "before:text-muted-foreground before:pointer-events-none",
-          !item.text && 'empty:before:content-[attr(data-placeholder)]'
-        )}
-      />
 
-      <div
-        {...attributes}
-        {...listeners}
-        className={cn(
-          "opacity-0 group-hover:opacity-100 cursor-move px-2 shrink-0",
-          "hover:text-blue-500 transition-opacity duration-200",
-          "touch-none select-none",
-          isDragging && "opacity-100"
-        )}
-      >
-        ⋮⋮
+        <div
+          {...attributes}
+          {...listeners}
+          className={cn(
+            "opacity-0 group-hover:opacity-100 cursor-move px-2 shrink-0",
+            "hover:text-blue-500 transition-opacity duration-200",
+            "touch-none select-none",
+            isDragging && "opacity-100"
+          )}
+        >
+          ⋮⋮
+        </div>
       </div>
+
+      {/* Show child items when parent is being dragged */}
+      {isDragging && childItems.length > 0 && (
+        <div className="ml-6 space-y-1">
+          {childItems.map(childItem => (
+            <div
+              key={childItem.id}
+              className={cn(
+                "flex items-start gap-2 p-2 rounded bg-muted min-h-[48px]",
+                "opacity-90"
+              )}
+            >
+              <div className="flex-1 px-1">
+                {childItem.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </li>
   );
 }
@@ -217,6 +260,7 @@ export function TaskListEditor({
   )
   const [activeId, setActiveId] = useState<string | null>(null)
   const editableRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const [draggingParentId, setDraggingParentId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -582,19 +626,26 @@ export function TaskListEditor({
     })
   }, [items])
 
-  const handleDragStart = () => {
+  const handleDragStart = (event: DragStartEvent) => {
     setActiveId(null);
+    const draggedItem = items.find(item => item.id === event.active.id);
+    if (draggedItem?.level === 0) {
+      setDraggingParentId(draggedItem.id);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    const draggedItem = items.find(item => item.id === active.id);
+    
+    // Always reset dragging parent ID
+    setDraggingParentId(null);
 
-    if (over && active.id !== over.id) {
+    if (over && draggedItem) {
       const oldIndex = items.findIndex(item => item.id === active.id);
       const newIndex = items.findIndex(item => item.id === over.id);
       
       // Find all child items that belong to the dragged parent
-      const draggedItem = items[oldIndex];
       let childItems: TaskItem[] = [];
       let childCount = 0;
       
@@ -611,32 +662,44 @@ export function TaskListEditor({
         }
       }
 
-      // Create a new array with the items in the correct order
-      let newItems = [...items];
-      
-      // Remove the parent and its children from their original position
-      newItems.splice(oldIndex, 1 + childCount);
-      
-      // Calculate the new insertion index, accounting for the removed items
-      const adjustedNewIndex = newIndex > oldIndex ? newIndex - (1 + childCount) : newIndex;
-      
-      // Insert the parent and its children at the new position
-      newItems.splice(adjustedNewIndex, 0, draggedItem, ...childItems);
-      
-      updateItems(newItems);
+      // Only reorder if dropping in a different position
+      if (active.id !== over.id) {
+        // Create a new array with the items in the correct order
+        let newItems = [...items];
+        
+        // Remove the parent and its children from their original position
+        newItems.splice(oldIndex, 1 + childCount);
+        
+        // Calculate the new insertion index, accounting for the removed items
+        const adjustedNewIndex = newIndex > oldIndex ? newIndex - (1 + childCount) : newIndex;
+        
+        // Insert the parent and its children at the new position
+        newItems.splice(adjustedNewIndex, 0, draggedItem, ...childItems);
+        
+        updateItems(newItems);
+      }
     }
-
+    
     // Set the dropped item as active and focus its text
     const activeId = active.id.toString();
     setActiveId(activeId);
     
-    // Focus the dropped item's text after a short delay to ensure all drag operations are complete
-    setTimeout(() => {
+    // Ensure all text content is properly restored after the drop
+    requestAnimationFrame(() => {
+      // Focus the dropped item
       const element = editableRefs.current.get(activeId);
       if (element) {
         focusElementAtEnd(element);
       }
-    }, 50);
+
+      // Restore text content for all items
+      items.forEach(item => {
+        const element = editableRefs.current.get(item.id);
+        if (element && element.textContent !== item.text) {
+          element.textContent = item.text;
+        }
+      });
+    });
   };
 
   return (
@@ -653,28 +716,41 @@ export function TaskListEditor({
           strategy={verticalListSortingStrategy}
         >
           <ul className={cn("list-none p-0 m-0 relative")}>
-            {items.map((item) => (
-              <SortableItem
-                key={item.id}
-                id={item.id}
-                item={item}
-                onTextChange={handleTextChange}
-                onCheckChange={handleCheckChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                isActive={activeId === item.id}
-                onFocus={() => {
-                  setActiveId(item.id)
-                  const element = editableRefs.current.get(item.id)
-                  if (element) {
-                    focusElementAtEnd(element)
-                  }
-                }}
-                onBlur={() => setActiveId(null)}
-                setEditableRef={setEditableRef}
-                category={category}
-              />
-            ))}
+            {items.map((item) => {
+              // Check if this item is a child of the currently dragging parent
+              const isChildOfDraggingParent = Boolean(
+                draggingParentId && 
+                item.level > 0 && 
+                items.slice(0, items.findIndex(i => i.id === item.id))
+                     .reverse()
+                     .find(i => i.level === 0)?.id === draggingParentId
+              );
+
+              return (
+                <SortableItem
+                  key={item.id}
+                  id={item.id}
+                  item={item}
+                  items={items}
+                  parentIsDragging={isChildOfDraggingParent}
+                  onTextChange={handleTextChange}
+                  onCheckChange={handleCheckChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  isActive={activeId === item.id}
+                  onFocus={() => {
+                    setActiveId(item.id)
+                    const element = editableRefs.current.get(item.id)
+                    if (element) {
+                      focusElementAtEnd(element)
+                    }
+                  }}
+                  onBlur={() => setActiveId(null)}
+                  setEditableRef={setEditableRef}
+                  category={category}
+                />
+              );
+            })}
           </ul>
         </SortableContext>
       </DndContext>
