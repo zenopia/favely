@@ -261,10 +261,16 @@ export function ListView({
                           .map((childItem, childIndex) => (
                           <li
                             key={`${item.id}-child-${childIndex}`}
-                            className="flex items-start border-b last:border-b-0 relative bg-muted/50 rounded-lg p-2"
+                            className={cn(
+                              "flex items-start border-b last:border-b-0 relative bg-muted/50 rounded-lg p-2",
+                              item.completed && "text-muted-foreground"
+                            )}
                           >
                             <div className="flex-1">
-                              <div className="font-medium">
+                              <div className={cn(
+                                "font-medium",
+                                item.completed && "text-muted-foreground"
+                              )}>
                                 <TextWithUrls text={childItem.title} />
                               </div>
                               {childItem.tag && (

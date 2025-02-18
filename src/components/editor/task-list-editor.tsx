@@ -115,6 +115,11 @@ function SortableItem({
     return null;
   }
 
+  // Find parent's checked status if this is a child item
+  const parentChecked = item.level > 0 ? items.slice(0, items.findIndex(i => i.id === id))
+    .reverse()
+    .find(i => i.level === 0)?.checked : false;
+
   const style = {
     transform: CSS.Transform.toString(transform && {
       ...transform,
@@ -144,7 +149,7 @@ function SortableItem({
         "flex items-start gap-2 p-2 rounded group relative min-h-[48px]",
         isActive && "bg-[#f3f1ff]",
         item.level > 0 && "bg-muted",
-        item.checked && item.level === 0 && "text-muted-foreground",
+        (item.checked || (item.level > 0 && parentChecked)) && "text-muted-foreground",
         item.tag && `border-l-[var(--category-${item.tag?.replace(/\s+/g, '-')})]`
       )}>
         {item.level === 0 && (
