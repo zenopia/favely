@@ -7,7 +7,7 @@ import { ListCategory } from "@/types/list";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import * as z from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Globe, Lock, EyeOff } from "lucide-react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 
@@ -301,9 +301,24 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="public">Public</SelectItem>
-                      <SelectItem value="unlisted">Unlisted</SelectItem>
-                      <SelectItem value="private">Private</SelectItem>
+                      <SelectItem value="public">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          <span>Public</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="unlisted">
+                        <div className="flex items-center gap-2">
+                          <EyeOff className="h-4 w-4" />
+                          <span>Unlisted</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="private">
+                        <div className="flex items-center gap-2">
+                          <Lock className="h-4 w-4" />
+                          <span>Private</span>
+                        </div>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
