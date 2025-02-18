@@ -19,7 +19,7 @@ interface ListPageContentProps {
   isOwner: boolean;
   isPinned: boolean;
   isFollowing: boolean;
-  isCollaborator: boolean;
+  _isCollaborator: boolean;
   returnPath?: string;
   isLoading?: boolean;
   error?: string;
@@ -30,7 +30,7 @@ export function ListPageContent({
   isOwner,
   isPinned: initialIsPinned,
   isFollowing: initialIsFollowing,
-  isCollaborator: initialIsCollaborator,
+  _isCollaborator: initialIsCollaborator,
   returnPath,
   isLoading: initialIsLoading,
   error: initialError
@@ -38,11 +38,11 @@ export function ListPageContent({
   const router = useRouter();
   const [showCollaborators, setShowCollaborators] = useState(false);
   const [isPinned, setIsPinned] = useState(initialIsPinned);
-  const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
-  const [isCollaborator, setIsCollaborator] = useState(initialIsCollaborator);
+  const [isFollowing, _setIsFollowing] = useState(initialIsFollowing);
+  const [isCollaborator, _setIsCollaborator] = useState(initialIsCollaborator);
   const { fetchWithAuth } = useProtectedFetch();
-  const { isSignedIn } = useAuthGuard({ protected: false }); // Don't force auth
-  const { user } = useAuthService();
+  const { isSignedIn: _isSignedIn } = useAuthGuard({ protected: false }); // Don't force auth
+  const { user: _user } = useAuthService();
 
   // Update local pin state when initial value changes
   useEffect(() => {
@@ -119,7 +119,7 @@ export function ListPageContent({
               isOwner={isOwner}
               isPinned={isPinned}
               isFollowing={isFollowing}
-              isCollaborator={isCollaborator}
+              _isCollaborator={isCollaborator}
               showCollaborators={showCollaborators}
               onCollaboratorsClick={() => setShowCollaborators(!showCollaborators)}
               onPinChange={handlePinChange}

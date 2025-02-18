@@ -216,7 +216,7 @@ export default async function ListPage({ params, searchParams }: PageProps) {
           isOwner={false}
           isPinned={false}
           isFollowing={false}
-          isCollaborator={false}
+          _isCollaborator={false}
           returnPath={searchParams.from || '/lists'}
         />
       );
@@ -243,7 +243,7 @@ export default async function ListPage({ params, searchParams }: PageProps) {
         isOwner={isOwner}
         isPinned={!!pinDoc}
         isFollowing={!!followStatus}
-        isCollaborator={isCollaborator}
+        _isCollaborator={isCollaborator}
         returnPath={returnPath}
       />
     );
