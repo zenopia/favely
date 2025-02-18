@@ -252,14 +252,12 @@ export function ListView({
         </div>
 
         {isSignedIn && user && isOwner && (
-          <div key="fab-section" className="fixed bottom-0 right-0 w-full pointer-events-none">
-            <div className="container max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-              <div className="pointer-events-auto flex justify-end">
-                <EditListFAB 
-                  listId={list.id} 
-                  username={list.owner.username}
-                />
-              </div>
+          <div key="fab-section" className="fixed bottom-0 right-0 p-4 pb-20 sm:pb-8 pointer-events-none">
+            <div className="pointer-events-auto w-fit ml-auto">
+              <EditListFAB 
+                listId={list.id} 
+                username={list.owner.username}
+              />
             </div>
           </div>
         )}
