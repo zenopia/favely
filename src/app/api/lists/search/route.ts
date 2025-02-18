@@ -15,7 +15,7 @@ export const GET = withAuth<RouteParams>(async (req: NextRequest) => {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("q") || "";
     const category = searchParams.get("category");
-    const privacy = searchParams.get("privacy");
+    const visibility = searchParams.get("visibility");
     const limit = parseInt(searchParams.get("limit") || "20");
     const page = parseInt(searchParams.get("page") || "1");
     const skip = (page - 1) * limit;
@@ -43,15 +43,15 @@ export const GET = withAuth<RouteParams>(async (req: NextRequest) => {
       searchQuery.category = category;
     }
 
-    if (privacy) {
-      searchQuery.privacy = privacy;
+    if (visibility) {
+      searchQuery.visibility = visibility;
     }
 
-    // If not authenticated or privacy filter is not "private",
+    // If not authenticated or visibility filter is not "private",
     // only show public lists and lists where user is owner/collaborator
-    if (!userId || privacy !== "private") {
+    if (!userId || visibility !== "private") {
       searchQuery.$or = [
-        { privacy: "public" },
+        { visibility: "public" },
         ...(userId ? [
           { "owner.clerkId": userId },
           {

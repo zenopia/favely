@@ -46,7 +46,7 @@ export interface ListFormProps {
     title: string;
     description?: string;
     category: ListCategory;
-    privacy: 'public' | 'private';
+    visibility: 'public' | 'private';
     items: Array<{
       id: string;
       title: string;
@@ -76,7 +76,7 @@ const formSchema = z.object({
   description: z.string()
     .max(500, "Description cannot exceed 500 characters")
     .optional(),
-  privacy: z.enum(["public", "unlisted", "private"] as const),
+  visibility: z.enum(["public", "unlisted", "private"] as const),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -115,7 +115,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
       title: defaultValues?.title || "",
       category: (defaultValues?.category === 'all' ? 'movies' : defaultValues?.category) || "movies",
       description: defaultValues?.description || "",
-      privacy: defaultValues?.privacy || "public",
+      visibility: defaultValues?.visibility || "public",
     },
   });
 
@@ -147,7 +147,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
         title: data.title,
         category: data.category,
         description: data.description,
-        privacy: data.privacy,
+        visibility: data.visibility,
         items: processedItems
       };
 
@@ -277,7 +277,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
 
             <FormField
               control={form.control}
-              name="privacy"
+              name="visibility"
               render={({ field }) => (
                 <FormItem>
                   <Select
@@ -286,7 +286,7 @@ export function ListFormContent({ defaultValues, mode = 'create', returnPath }: 
                   >
                     <FormControl>
                       <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Privacy" />
+                        <SelectValue placeholder="Visibility" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

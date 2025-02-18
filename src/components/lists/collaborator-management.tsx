@@ -56,9 +56,9 @@ interface FollowingUser {
 interface CollaboratorManagementProps {
   listId: string;
   isOwner: boolean;
-  privacy: 'public' | 'unlisted' | 'private';
+  visibility: 'public' | 'unlisted' | 'private';
   onClose: () => void;
-  onPrivacyChange?: (privacy: 'public' | 'unlisted' | 'private') => void;
+  onVisibilityChange?: (visibility: 'public' | 'unlisted' | 'private') => void;
   currentUserRole?: 'owner' | 'admin' | 'editor' | 'viewer';
   owner: {
     clerkId: string;
@@ -71,9 +71,9 @@ interface CollaboratorManagementProps {
 export function CollaboratorManagement({ 
   listId, 
   isOwner, 
-  privacy: initialPrivacy,
+  visibility: initialVisibility,
   onClose,
-  onPrivacyChange,
+  onVisibilityChange,
   currentUserRole,
   owner
 }: CollaboratorManagementProps) {
@@ -85,7 +85,7 @@ export function CollaboratorManagement({
   const [isLoadingCollaborators, setIsLoadingCollaborators] = useState(true);
   const [followingIds, setFollowingIds] = useState<string[]>([]);
   const [isLoadingFollowing, setIsLoadingFollowing] = useState(true);
-  const [privacy, setPrivacy] = useState(initialPrivacy);
+  const [visibility, setVisibility] = useState(initialVisibility);
   const parentRef = React.useRef<HTMLDivElement>(null);
 
   const canManageCollaborators = isOwner || currentUserRole === 'admin';
@@ -284,10 +284,10 @@ export function CollaboratorManagement({
     }
   };
 
-  const togglePrivacy = async (newPrivacy: 'public' | 'unlisted' | 'private') => {
+  const toggleVisibility = async (newVisibility: 'public' | 'unlisted' | 'private') => {
     setIsLoading(true);
     // Update state immediately for smoother UI
-    setPrivacy(newPrivacy);
+    setVisibility(newVisibility);
     
     try {
       const response = await fetch(`/api/lists/${listId}`, {
@@ -296,21 +296,21 @@ export function CollaboratorManagement({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          privacy: newPrivacy,
+          visibility: newVisibility,
         }),
       });
 
       if (!response.ok) {
         // Revert on error
-        setPrivacy(privacy);
+        setVisibility(visibility);
         throw new Error();
       }
 
       const updatedList = await response.json();
-      onPrivacyChange?.(updatedList.privacy);
-      toast.success("Privacy updated!");
+      onVisibilityChange?.(updatedList.visibility);
+      toast.success("Visibility updated!");
     } catch (error) {
-      toast.error("Failed to update privacy");
+      toast.error("Failed to update visibility");
     } finally {
       setIsLoading(false);
     }
@@ -484,31 +484,31 @@ export function CollaboratorManagement({
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      {privacy === "public" ? (
+                      {visibility === "public" ? (
                         <Globe className="h-4 w-4" />
-                      ) : privacy === "unlisted" ? (
+                      ) : visibility === "unlisted" ? (
                         <EyeOff className="h-4 w-4" />
                       ) : (
                         <Lock className="h-4 w-4" />
                       )}
                       <h3 className="font-medium">
-                        {privacy === "public" ? "Public" : privacy === "unlisted" ? "Unlisted" : "Private"} List
+                        {visibility === "public" ? "Public" : visibility === "unlisted" ? "Unlisted" : "Private"} List
                       </h3>
                     </div>
                     <p className="text-sm text-muted-foreground pr-2">
-                      {privacy === "public"
+                      {visibility === "public"
                         ? "Anyone can view this list"
-                        : privacy === "unlisted"
+                        : visibility === "unlisted"
                         ? "Anyone with the link can view this list. The list wont appear in your profile or in search results."
                         : "Only you and your added collaborators can view this list"}
                     </p>
                   </div>
                   {(isOwner || collaborators.some(c => c.role === 'admin')) && (
                     <Select
-                      value={privacy}
+                      value={visibility}
                       onValueChange={(value: 'public' | 'unlisted' | 'private') => {
-                        if (value !== privacy) {
-                          togglePrivacy(value);
+                        if (value !== visibility) {
+                          toggleVisibility(value);
                         }
                       }}
                       disabled={isLoading}

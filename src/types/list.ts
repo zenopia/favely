@@ -30,7 +30,7 @@ export const OWNER_FILTER_OPTIONS = [
   { value: 'collaborated', label: 'Collaborated Lists' }
 ] as const;
 
-export type ListPrivacy = 'public' | 'unlisted' | 'private';
+export type ListVisibility = 'public' | 'unlisted' | 'private';
 export type ListType = 'ordered' | 'bullet';
 
 export interface ListItem {
@@ -77,7 +77,7 @@ export interface List {
   title: string;
   description?: string;
   category: ListCategory;
-  privacy: ListPrivacy;
+  visibility: ListVisibility;
   listType: ListType;
   owner: ListOwner;
   items?: ListItem[];

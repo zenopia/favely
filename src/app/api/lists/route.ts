@@ -14,7 +14,7 @@ interface _RouteParams {
 interface ListQuery {
   "owner.clerkId": string;
   category?: string;
-  privacy?: string;
+  visibility?: string;
 }
 
 interface ListItem {
@@ -37,14 +37,14 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
-    const privacy = searchParams.get("privacy");
+    const visibility = searchParams.get("visibility");
     const query: ListQuery = { "owner.clerkId": userId };
 
     if (category) {
       query.category = category;
     }
-    if (privacy) {
-      query.privacy = privacy;
+    if (visibility) {
+      query.visibility = visibility;
     }
 
     const { lists } = await getEnhancedLists(query);

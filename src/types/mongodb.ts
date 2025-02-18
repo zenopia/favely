@@ -5,7 +5,7 @@ export interface MongoListDocument {
   title: string;
   description?: string;
   category: ListCategory;
-  privacy: 'public' | 'private';
+  visibility: 'public' | 'private';
   owner: {
     userId: string;
     clerkId: string;
@@ -48,7 +48,7 @@ export interface MongoListFilter {
   'collaborators.userId'?: string;
   'collaborators.clerkId'?: string;
   category?: ListCategory;
-  privacy?: 'public' | 'private';
+  visibility?: 'public' | 'private';
 }
 
 export interface MongoSortOptions {

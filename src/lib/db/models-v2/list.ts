@@ -32,7 +32,7 @@ export interface ListDocument extends Document {
   title: string;
   description?: string;
   category: string;
-  privacy: 'public' | 'unlisted' | 'private';
+  visibility: 'public' | 'unlisted' | 'private';
   listType: 'ordered' | 'bullet';
   owner: ListOwner;
   collaborators: ListCollaborator[];
@@ -86,7 +86,7 @@ const listSchema = new Schema<ListDocument>({
   title: { type: String, required: true },
   description: { type: String },
   category: { type: String, enum: LIST_CATEGORIES, required: true },
-  privacy: { type: String, enum: ['public', 'unlisted', 'private'], default: 'public' },
+  visibility: { type: String, enum: ['public', 'unlisted', 'private'], default: 'public' },
   listType: { type: String, enum: ['ordered', 'bullet'], default: 'ordered' },
   owner: { type: OwnerSchema, required: true },
   collaborators: [CollaboratorSchema],
@@ -114,7 +114,7 @@ listSchema.index({
 
 // Access control index
 listSchema.index({ 
-  privacy: 1,
+  visibility: 1,
   'owner.clerkId': 1,
   'collaborators.clerkId': 1,
   'collaborators.email': 1,

@@ -109,10 +109,10 @@ export function ListGrid({
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <CategoryBadge category={list.category} />
-                          {showPrivacyBadge && list.privacy === 'private' && (
+                          {showPrivacyBadge && list.visibility === 'private' && (
                             <Lock className="h-4 w-4 text-muted-foreground" />
                           )}
-                          {showPrivacyBadge && list.privacy === 'unlisted' && (
+                          {showPrivacyBadge && list.visibility === 'unlisted' && (
                             <EyeOff className="h-4 w-4 text-muted-foreground" />
                           )}
                         </div>

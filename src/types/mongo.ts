@@ -6,7 +6,7 @@ export interface MongoListDocument {
   title: string;
   description?: string;
   category: string;
-  privacy: 'public' | 'private';
+  visibility: 'public' | 'private';
   listType: 'ordered' | 'bullet';
   owner: {
     userId: Types.ObjectId;
